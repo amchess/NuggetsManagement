@@ -43,6 +43,13 @@ Se desideri eseguire il software dal codice sorgente o modificarlo:
 	```bash
 	pip install -r requirements.txt
 	```
+## ▶️ Esecuzione del Programma (Sorgente)
+Una volta impostati i parametri nel file `config.json` e attivato l'ambiente virtuale, assicurati di trovarti nella directory principale del progetto e lancia il seguente comando dal terminale:
+
+```bash
+python src/main.py
+```
+
 ## ⚙️ Configurazione (`config.json`)
 Il comportamento del software è interamente gestito tramite il file `config.json` situato nella root del progetto. Prima di avviare l'analisi, assicurati di compilare questi parametri:
 
