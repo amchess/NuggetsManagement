@@ -1,0 +1,11 @@
+{
+    "engine_path": "stockfish", 
+    "pgn_path": "data/test.pgn",
+    "output_dir": "data/output",
+    "concurrency": 4,
+    "analysis_time": 1.0,
+    "wdl_tolerance": 0.06,
+    "threads": 1,
+    "hash": 64,
+    "syzygy_path": ""
+}
