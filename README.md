@@ -43,6 +43,19 @@ Se desideri eseguire il software dal codice sorgente o modificarlo:
 	```bash
 	pip install -r requirements.txt
 	```
+## ⚙️ Configurazione (`config.json`)
+Il comportamento del software è interamente gestito tramite il file `config.json` situato nella root del progetto. Prima di avviare l'analisi, assicurati di compilare questi parametri:
+
+* `engine_path`: Il percorso assoluto o relativo all'eseguibile del motore UCI (es. `"C:\\percorsi\\stockfish.exe"` su Windows o `"stockfish"` su Linux se è nel PATH).
+* `pgn_path`: Il percorso del file PGN contenente il database di partite da analizzare (es. `"data/partite.pgn"`).
+* `output_dir`: La cartella dove verranno salvati i report finali (JSONL, CSV, HTML).
+* `concurrency`: Il numero di processi motore da lanciare in parallelo. Impostalo in base ai core fisici della tua CPU (es. `4` o `8`).
+* `analysis_time`: Il tempo in secondi dedicato all'analisi WDL (e MultiPV) per ogni singola posizione (es. `1.0`).
+* `wdl_tolerance`: Il margine di tolleranza rispetto ai target WDL (75% e 25%). Ad esempio, `0.06` significa una tolleranza del $\pm$ 6% (catturerà valori tra 69% e 81%).
+* `threads`: Il numero di thread CPU allocati per *singola* istanza del motore (es. `1`). Attenzione: il numero totale di thread usati sarà `concurrency * threads`.
+* `hash`: La dimensione della Hash Table (in MB) allocata per singola istanza (es. `64`).
+* `syzygy_path`: (Opzionale) Il percorso alle tablebases dei finali (es. `"C:\\syzygy"`). Lasciare vuoto `""` se non utilizzato.
+  
 ## 📦 Generazione dell'Eseguibile (Standalone)
 
 Puoi compilare NuggetsManagement in un unico file eseguibile, in modo da poterlo distribuire a chi non ha Python installato. Utilizziamo `pyinstaller`.
