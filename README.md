@@ -65,23 +65,45 @@ Il comportamento del software è interamente gestito tramite il file `config.jso
   
 ## 📦 Generazione dell'Eseguibile (Standalone)
 
-Puoi compilare NuggetsManagement in un unico file eseguibile, in modo da poterlo distribuire a chi non ha Python installato. Utilizziamo `pyinstaller`.
+Puoi compilare NuggetsManagement in un unico file eseguibile per distribuirlo senza costringere l'utente finale a installare Python o configurare un ambiente virtuale. Utilizziamo `pyinstaller`.
 
-**1. Installa PyInstaller:**
-Assicurati di avere l'ambiente virtuale attivo nel tuo terminale, quindi esegui:
-	```bash
-	pip install pyinstaller
-	```
-Compila il progetto (il comando crea un singolo file nascosto la finestra della console se non necessaria, ma in questo caso ci serve per i log):
+**⚠️ Nota importante:** La compilazione non è cross-platform. Per generare un `.exe` per Windows devi eseguire il comando su Windows. Per generare un binario Linux, devi eseguirlo su Linux.
+
+### 1. Preparazione
+Assicurati di avere il tuo ambiente virtuale (`.venv`) attivato, poiché PyInstaller ha bisogno di "vedere" le librerie installate (come `python-chess`).
+```bash
+pip install pyinstaller
+```
+### 2. Compilazione
+Esegui il comando corrispondente al tuo sistema operativo dalla cartella radice del progetto:
 
 **Su Windows:**
-	```bash
-	pyinstaller --onefile --name NuggetsManagement src/main.py
-	```
+```bash
+pyinstaller --onefile --name NuggetsManagement src/main.py
+```
 **Su Linux:**
-	```bash
-	pyinstaller --onefile --name NuggetsManagement_linux src/main.py
-	```
+```bash
+pyinstaller --onefile --name NuggetsManagement_linux src/main.py
+```
+(Su Linux, ricordati di dare i permessi di esecuzione al file generato con chmod +x dist/NuggetsManagement_linux).
+
+### 3. Come distribuire il software
+PyInstaller impacchetta il codice Python, ma non include i file esterni per scelta architettonica (vogliamo che l'utente possa cambiare le impostazioni senza ricompilare).
+
+Per distribuire il programma, crea una cartella e inserisci i seguenti file, prelevando l'eseguibile appena creato dalla cartella dist/:
+
+```text
+NuggetsManagement_Release/
+│
+├── NuggetsManagement.exe    <-- Il file compilato (da dist/)
+├── config.json              <-- Il file di configurazione
+├── stockfish.exe            <-- Il motore scacchistico
+└── data/                    <-- La cartella con i PGN da analizzare
+    └── partite.pgn
+```
+
+L'utente finale dovrà semplicemente aprire il config.json, assicurarsi che i percorsi siano corretti e fare doppio clic sull'eseguibile!
+
 ## 📄 Licenza
 Questo progetto è distribuito sotto licenza **MIT**. Sentiti libero di utilizzarlo, modificarlo e integrarlo nei tuoi progetti (commerciali e non). Vedi il file `LICENSE` per i dettagli.
 

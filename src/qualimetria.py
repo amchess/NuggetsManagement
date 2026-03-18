@@ -8,19 +8,20 @@ class GamePhase(Enum):
     TRANSIZIONE_FINALE = "Transizione Finale"
     FINALE = "Finale"
 
+# Spostato a livello globale così può essere usato da tutte le funzioni
+PIECE_VALUES = {
+    chess.KING: 0.0,
+    chess.QUEEN: 9.0,
+    chess.ROOK: 5.0,
+    chess.BISHOP: 3.0,
+    chess.KNIGHT: 3.0,
+    chess.PAWN: 1.0
+}
+
 def get_game_phase(board: chess.Board) -> GamePhase:
     """
     Determina la fase della partita basata sull'algoritmo di Smirnov corretto.
     """
-    PIECE_VALUES = {
-        chess.KING: 0.0,
-        chess.QUEEN: 9.0,
-        chess.ROOK: 5.0,
-        chess.BISHOP: 3.0,
-        chess.KNIGHT: 3.0,
-        chess.PAWN: 1.0
-    }
-    
     tot_mat_fase = 0.0
     num_tot_unit = 0
     
@@ -154,3 +155,13 @@ def analyze_center_type(board: chess.Board) -> str:
         return "Dynamic Center (Hanging Pawns)"
 
     return "Dynamic Center"
+
+def get_tension(board: chess.Board) -> int:
+    """Restituisce il numero di catture legali istantaneamente possibili."""
+    return len(list(board.generate_legal_captures()))
+
+def get_material_imbalance(board: chess.Board) -> float:
+    """Calcola l'asimmetria del materiale."""
+    w_mat = sum(PIECE_VALUES[p.piece_type] for p in board.piece_map().values() if p.color == chess.WHITE)
+    b_mat = sum(PIECE_VALUES[p.piece_type] for p in board.piece_map().values() if p.color == chess.BLACK)
+    return round(abs(w_mat - b_mat), 2)

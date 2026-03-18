@@ -67,7 +67,7 @@ async def run_worker(worker_id: int, queue: asyncio.Queue, state: StateManager, 
                 
                 # Assicuriamoci che l'engine abbia fornito il dato WDL
                 if "wdl" in info:
-                    wdl_exp = info["wdl"].expectation()
+                    wdl_exp = info["wdl"].white().expectation()
                     
                     is_high = target_high_min <= wdl_exp <= target_high_max
                     is_low = target_low_min <= wdl_exp <= target_low_max
