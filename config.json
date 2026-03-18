@@ -1,5 +1,5 @@
 {
-    "engine_path": "stockfish", 
+    "engine_path": "stockfish.exe", 
     "pgn_path": "data/test.pgn",
     "output_dir": "data/output",
     "concurrency": 4,

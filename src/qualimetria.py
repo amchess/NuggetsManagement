@@ -1,20 +1,26 @@
 import chess
-from state_manager import GamePhase
+from enum import Enum
 
-# Costanti per il valore dei pezzi (Algoritmo di Smirnov e Asimmetria)
-PIECE_VALUES = {
-    chess.KING: 0.0,
-    chess.QUEEN: 9.0,
-    chess.ROOK: 5.0,
-    chess.BISHOP: 3.0,
-    chess.KNIGHT: 3.0,
-    chess.PAWN: 1.0
-}
+class GamePhase(Enum):
+    APERTURA = "Apertura"
+    MEDIOGIOCO = "Mediogioco"
+    TRANSIZIONE_MEDIOGIOCO = "Transizione Mediogioco"
+    TRANSIZIONE_FINALE = "Transizione Finale"
+    FINALE = "Finale"
 
 def get_game_phase(board: chess.Board) -> GamePhase:
     """
-    Determina la fase della partita basata sull'algoritmo di Smirnov.
+    Determina la fase della partita basata sull'algoritmo di Smirnov corretto.
     """
+    PIECE_VALUES = {
+        chess.KING: 0.0,
+        chess.QUEEN: 9.0,
+        chess.ROOK: 5.0,
+        chess.BISHOP: 3.0,
+        chess.KNIGHT: 3.0,
+        chess.PAWN: 1.0
+    }
+    
     tot_mat_fase = 0.0
     num_tot_unit = 0
     
@@ -31,6 +37,7 @@ def get_game_phase(board: chess.Board) -> GamePhase:
     else:
         phase_index = (num_tot_unit * tot_mat_fase) / (3 * (num_semi_move + 0.001))
         
+    # Thresholds come da tue indicazioni
     if 0 <= phase_index < 5:
         return GamePhase.FINALE
     elif 5 <= phase_index < 10:
@@ -44,14 +51,17 @@ def get_game_phase(board: chess.Board) -> GamePhase:
 
 def analyze_center_type(board: chess.Board) -> str:
     """
-    Classifica il tipo di centro usando l'algebra dei Bitboard per alte prestazioni.
+    Analizza il tipo di centro traducendo la logica bitboard dal C++ a python-chess.
     """
+    # Estraiamo i bitboard dei pedoni per efficienza (maschere a 64 bit)
     w_pawns = int(board.pieces(chess.PAWN, chess.WHITE))
     b_pawns = int(board.pieces(chess.PAWN, chess.BLACK))
     
+    # Helper per creare maschere di singole case
     def sq_bb(square: int) -> int:
         return 1 << square
 
+    # Presenza di pedoni sulle case critiche
     w_d4 = bool(w_pawns & sq_bb(chess.D4))
     w_e4 = bool(w_pawns & sq_bb(chess.E4))
     w_d5 = bool(w_pawns & sq_bb(chess.D5))
@@ -93,6 +103,7 @@ def analyze_center_type(board: chess.Board) -> str:
 
     # 3. Centro STATICO
     if (w_d4 and b_d5) and not (w_e4 or b_e4 or w_e5 or b_e5):
+        # Verifica tensione immediata sui fianchi
         w_tension = w_pawns & (chess.BB_RANK_3 | chess.BB_RANK_4)
         b_tension = b_pawns & (chess.BB_RANK_6 | chess.BB_RANK_5)
         if not w_tension and not b_tension:
@@ -110,7 +121,7 @@ def analyze_center_type(board: chess.Board) -> str:
     if (b_d5 and (b_e6 or b_c6)) or (b_e5 and (b_d6 or b_f6)):
         return "Mobile Center"
 
-    # 5. Centro DINAMICO
+    # 5. Centro DINAMICO (IQP e Pedoni Sospesi)
     def is_isolated(color_pawns_bb: int, square: int) -> bool:
         file_idx = chess.square_file(square)
         left_file_bb = chess.BB_FILES[file_idx - 1] if file_idx > 0 else 0
@@ -120,4 +131,26 @@ def analyze_center_type(board: chess.Board) -> str:
         if right_file_bb and (color_pawns_bb & right_file_bb): return False
         return True
 
-    if w_d4 and is_isolated(w_pawns, chess.D4): return "Dynamic Center (Isolated Queen's Pawn
+    if w_d4 and is_isolated(w_pawns, chess.D4): return "Dynamic Center (Isolated Queen's Pawn)"
+    if b_d5 and is_isolated(b_pawns, chess.D5): return "Dynamic Center (Isolated Queen's Pawn)"
+
+    def has_hanging_pawns(color_pawns_bb: int) -> bool:
+        # Controlliamo le colonne da B a G (indici da 1 a 6)
+        for f in range(1, 7):
+            current_file_bb = chess.BB_FILES[f]
+            left_file_bb = chess.BB_FILES[f - 1]
+            
+            # Pedoni su due colonne adiacenti
+            if (color_pawns_bb & current_file_bb) and (color_pawns_bb & left_file_bb):
+                outer_left_bb = chess.BB_FILES[f - 2] if (f - 2) >= 0 else 0
+                outer_right_bb = chess.BB_FILES[f + 1] if (f + 1) <= 7 else 0
+                
+                # Nessun pedone sulle colonne esterne
+                if not (color_pawns_bb & outer_left_bb) and not (color_pawns_bb & outer_right_bb):
+                    return True
+        return False
+
+    if has_hanging_pawns(w_pawns) or has_hanging_pawns(b_pawns):
+        return "Dynamic Center (Hanging Pawns)"
+
+    return "Dynamic Center"
