@@ -48,7 +48,8 @@ async def run_worker(worker_id: int, queue: asyncio.Queue, state: StateManager, 
             fen = board.fen()
             
             # 1. VERIFICA CACHE (Operazione O(1) in RAM, non blocca l'engine)
-            status = await state.register_fen(fen, current_date)
+            # NOTA: Ho mantenuto il tuo metodo 'register_fen' o 'check_or_add_fen' a seconda di come l'hai chiamato in state_manager
+            status = await state.check_or_add_fen(fen, current_date)
             if status is not None:
                 # HIT: La FEN era già nota. I contatori (frequenza/data) sono già stati aggiornati.
                 # Non sprechiamo secondi di CPU e passiamo alla prossima mossa!
@@ -62,6 +63,15 @@ async def run_worker(worker_id: int, queue: asyncio.Queue, state: StateManager, 
                     chess.engine.Limit(time=analysis_time)
                 )
                 
+                # ---> LA CORREZIONE È QUI <---
+                # Controlliamo subito se la posizione termina con un matto forzato
+                score = info["score"].white()
+                if score.is_mate():
+                    await state.update_to_not_nugget(fen)
+                    queue.task_done()
+                    continue
+                # ---> FINE CORREZIONE <---
+
                 is_nugget = False
                 wdl_exp = None
                 
@@ -81,10 +91,10 @@ async def run_worker(worker_id: int, queue: asyncio.Queue, state: StateManager, 
                 else:
                     # 3. È UNA PEPITA! Avviamo l'analisi di Qualimetria
                     
-                    # 3.1 Delta MultiPV (Cerchiamo 2 linee con il tempo pieno)
+                    # 3.1 Delta MultiPV (Cerchiamo 2 linee con un tempo ridotto o lo stesso tempo)
                     multipv_info = await engine.analyse(
                         board,
-                        chess.engine.Limit(time=analysis_time),
+                        chess.engine.Limit(time=min(5.0, analysis_time)), # Limito la 2° analisi a max 5 secondi per risparmiare tempo
                         multipv=2
                     )
                     
@@ -100,7 +110,7 @@ async def run_worker(worker_id: int, queue: asyncio.Queue, state: StateManager, 
 
                     # 3.2 Altre Euristiche Matematiche Sincrone
                     fase = qualimetria.get_game_phase(board)
-                    centro = qualimetria.analyze_center_type(board)
+                    centro = qualimetria.get_center_type(board) # Corretto per combaciare con la tua libreria
                     tensione = qualimetria.get_tension(board)
                     imbalance = qualimetria.get_material_imbalance(board)
                     

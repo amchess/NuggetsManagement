@@ -38,7 +38,6 @@ def get_game_phase(board: chess.Board) -> GamePhase:
     else:
         phase_index = (num_tot_unit * tot_mat_fase) / (3 * (num_semi_move + 0.001))
         
-    # Thresholds come da tue indicazioni
     if 0 <= phase_index < 5:
         return GamePhase.FINALE
     elif 5 <= phase_index < 10:
@@ -52,17 +51,16 @@ def get_game_phase(board: chess.Board) -> GamePhase:
 
 def analyze_center_type(board: chess.Board) -> str:
     """
-    Analizza il tipo di centro traducendo la logica bitboard dal C++ a python-chess.
+    Analizza il tipo di centro traducendo ESATTAMENTE la logica corretta dal C++ 
+    (pawns_element.cpp) a python-chess.
     """
-    # Estraiamo i bitboard dei pedoni per efficienza (maschere a 64 bit)
     w_pawns = int(board.pieces(chess.PAWN, chess.WHITE))
     b_pawns = int(board.pieces(chess.PAWN, chess.BLACK))
     
-    # Helper per creare maschere di singole case
     def sq_bb(square: int) -> int:
         return 1 << square
 
-    # Presenza di pedoni sulle case critiche
+    # Variabili booleane di presenza pedoni
     w_d4 = bool(w_pawns & sq_bb(chess.D4))
     w_e4 = bool(w_pawns & sq_bb(chess.E4))
     w_d5 = bool(w_pawns & sq_bb(chess.D5))
@@ -81,19 +79,48 @@ def analyze_center_type(board: chess.Board) -> str:
     b_c6 = bool(b_pawns & sq_bb(chess.C6))
     b_f6 = bool(b_pawns & sq_bb(chess.F6))
 
+    # Conta i pedoni centrali per colore
     white_center_count = sum([w_d4, w_e4, w_d5, w_e5])
     black_center_count = sum([b_d4, b_e4, b_d5, b_e5])
 
-    # 1. Centro APERTO
+    # 1. Centro APERTO: nessun pedone sulle 4 case centrali
     if white_center_count == 0 and black_center_count == 0:
         return "Open Center"
 
-    # 2. Centro CHIUSO
+    # Preparazione per verifiche di tensione (come nel C++)
+    FileDBB = chess.BB_FILES[3]
+    FileEBB = chess.BB_FILES[4]
+    
+    w_center_pawns = w_pawns & (FileDBB | FileEBB)
+    b_center_pawns = b_pawns & (FileDBB | FileEBB)
+
+    # Funzione helper per calcolare gli attacchi dei pedoni
+    def pawn_attacks_bb(pawns: int, color: chess.Color) -> int:
+        attacks = 0
+        if color == chess.WHITE:
+            attacks |= (pawns << 7) & ~chess.BB_FILE_H
+            attacks |= (pawns << 9) & ~chess.BB_FILE_A
+        else:
+            attacks |= (pawns >> 7) & ~chess.BB_FILE_A
+            attacks |= (pawns >> 9) & ~chess.BB_FILE_H
+        return attacks & 0xFFFFFFFFFFFFFFFF
+
+    w_center_attacks = pawn_attacks_bb(w_center_pawns, chess.WHITE)
+    b_center_attacks = pawn_attacks_bb(b_center_pawns, chess.BLACK)
+
+    # C'è tensione se i pedoni centrali possono catturarsi a vicenda
+    central_tension = bool((w_center_attacks & b_center_pawns) or (b_center_attacks & w_center_pawns))
+
     closed_center = False
-    if (w_d4 and b_d5) or (w_e4 and b_e5) or (w_d5 and b_d4) or (w_e5 and b_e4):
-        if not ((not w_d4 and not b_d4 and not w_d5 and not b_d5) or 
-                (not w_e4 and not b_e4 and not w_e5 and not b_e5)):
-            closed_center = True
+
+    # 2. Centro CHIUSO (Codice corretto da C++: tensione annulla la chiusura)
+    if not central_tension:
+        # Verifichiamo la presenza di almeno un blocco frontale
+        if (w_d4 and b_d5) or (w_e4 and b_e5) or (w_d5 and b_d6) or (w_e5 and b_e6):
+            # Un vero centro chiuso richiede pedoni su entrambe le colonne centrali per entrambi i colori
+            if (w_center_pawns & FileDBB) and (w_center_pawns & FileEBB) and \
+               (b_center_pawns & FileDBB) and (b_center_pawns & FileEBB):
+                closed_center = True
 
     if closed_center:
         if (w_d4 and w_e5 and b_d5 and b_e6) or (b_d4 and b_e5 and w_d5 and w_e3):
@@ -102,18 +129,24 @@ def analyze_center_type(board: chess.Board) -> str:
             return "Closed Center (King's Indian Chain)"
         return "Closed Center"
 
-    # 3. Centro STATICO
+    # 3. Centro STATICO: pedoni centrali fissi su colonne opposte (Correzione bug tensioni)
+    Rank3BB = chess.BB_RANKS[2]
+    Rank4BB = chess.BB_RANKS[3]
+    Rank5BB = chess.BB_RANKS[4]
+    Rank6BB = chess.BB_RANKS[5]
+
     if (w_d4 and b_d5) and not (w_e4 or b_e4 or w_e5 or b_e5):
-        # Verifica tensione immediata sui fianchi
-        w_tension = w_pawns & (chess.BB_RANK_3 | chess.BB_RANK_4)
-        b_tension = b_pawns & (chess.BB_RANK_6 | chess.BB_RANK_5)
-        if not w_tension and not b_tension:
+        no_immediate_tension = True
+        if (w_pawns & (Rank3BB | Rank4BB)) or (b_pawns & (Rank6BB | Rank5BB)):
+            no_immediate_tension = False
+        if no_immediate_tension:
             return "Static Center (d4-d5)"
 
     if (w_e4 and b_e5) and not (w_d4 or b_d4 or w_d5 or b_d5):
-        w_tension = w_pawns & (chess.BB_RANK_3 | chess.BB_RANK_4)
-        b_tension = b_pawns & (chess.BB_RANK_6 | chess.BB_RANK_5)
-        if not w_tension and not b_tension:
+        no_immediate_tension = True
+        if (w_pawns & (Rank3BB | Rank4BB)) or (b_pawns & (Rank6BB | Rank5BB)):
+            no_immediate_tension = False
+        if no_immediate_tension:
             return "Static Center (e4-e5)"
 
     # 4. Centro MOBILE
@@ -122,39 +155,56 @@ def analyze_center_type(board: chess.Board) -> str:
     if (b_d5 and (b_e6 or b_c6)) or (b_e5 and (b_d6 or b_f6)):
         return "Mobile Center"
 
-    # 5. Centro DINAMICO (IQP e Pedoni Sospesi)
-    def is_isolated(color_pawns_bb: int, square: int) -> bool:
-        file_idx = chess.square_file(square)
-        left_file_bb = chess.BB_FILES[file_idx - 1] if file_idx > 0 else 0
-        right_file_bb = chess.BB_FILES[file_idx + 1] if file_idx < 7 else 0
+    # 5. Centro DINAMICO (Logica IQP e Hanging Pawns corretta dal C++)
+    def is_isolated(color_pawns_bb: int, sq: int) -> bool:
+        f = chess.square_file(sq)
+        left_f = f - 1
+        right_f = f + 1
         
-        if left_file_bb and (color_pawns_bb & left_file_bb): return False
-        if right_file_bb and (color_pawns_bb & right_file_bb): return False
+        if left_f >= 0 and (color_pawns_bb & chess.BB_FILES[left_f]):
+            return False
+        if right_f <= 7 and (color_pawns_bb & chess.BB_FILES[right_f]):
+            return False
         return True
 
-    if w_d4 and is_isolated(w_pawns, chess.D4): return "Dynamic Center (Isolated Queen's Pawn)"
-    if b_d5 and is_isolated(b_pawns, chess.D5): return "Dynamic Center (Isolated Queen's Pawn)"
+    if w_d4 and is_isolated(w_pawns, chess.D4):
+        return "Dynamic Center (Isolated Queen's Pawn)"
+    if b_d5 and is_isolated(b_pawns, chess.D5):
+        return "Dynamic Center (Isolated Queen's Pawn)"
 
-    def has_hanging_pawns(color_pawns_bb: int) -> bool:
-        # Controlliamo le colonne da B a G (indici da 1 a 6)
-        for f in range(1, 7):
-            current_file_bb = chess.BB_FILES[f]
-            left_file_bb = chess.BB_FILES[f - 1]
-            
-            # Pedoni su due colonne adiacenti
-            if (color_pawns_bb & current_file_bb) and (color_pawns_bb & left_file_bb):
-                outer_left_bb = chess.BB_FILES[f - 2] if (f - 2) >= 0 else 0
-                outer_right_bb = chess.BB_FILES[f + 1] if (f + 1) <= 7 else 0
+    # Funzione Hanging Pawns fedele al C++ (find_hanging_pawns)
+    def find_hanging_pawns(color_pawns: int, color: chess.Color) -> bool:
+        # P = iterazione sui pedoni (per simulare il pop_lsb del C++)
+        for s in chess.SQUARES:
+            if not (color_pawns & sq_bb(s)):
+                continue
                 
-                # Nessun pedone sulle colonne esterne
-                if not (color_pawns_bb & outer_left_bb) and not (color_pawns_bb & outer_right_bb):
-                    return True
+            f = chess.square_file(s)
+            r = chess.square_rank(s)
+            
+            # Devono essere pedoni centrali o semi-centrali (c, d, e) -> indici 2, 3, 4
+            if 2 <= f <= 4:
+                # Devono essere avanzati (non sulle traverse di partenza)
+                is_advanced = (r >= 2) if color == chess.WHITE else (r <= 5)
+                
+                # Controlliamo che ci sia il compagno esattamente a destra (s+1)
+                # Nota: In python-chess la casa s+1 è quella a destra se f non è H
+                if is_advanced and (color_pawns & sq_bb(s + 1)):
+                    left_outer = f - 1
+                    right_outer = f + 2
+                    
+                    has_left_outer = bool(color_pawns & chess.BB_FILES[left_outer]) if left_outer >= 0 else False
+                    has_right_outer = bool(color_pawns & chess.BB_FILES[right_outer]) if right_outer <= 7 else False
+                    
+                    if not has_left_outer and not has_right_outer:
+                        return True
         return False
 
-    if has_hanging_pawns(w_pawns) or has_hanging_pawns(b_pawns):
+    if find_hanging_pawns(w_pawns, chess.WHITE) or find_hanging_pawns(b_pawns, chess.BLACK):
         return "Dynamic Center (Hanging Pawns)"
 
     return "Dynamic Center"
+
 
 def get_tension(board: chess.Board) -> int:
     """Restituisce il numero di catture legali istantaneamente possibili."""

@@ -1,0 +1,139 @@
+
+    <!DOCTYPE html>
+    <html lang="it">
+    <head>
+        <meta charset="UTF-8">
+        <title>Report Qualimetria Pepite - NuggetsManagement</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+            .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+            h1, h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+            .stats-grid { display: flex; gap: 20px; margin-bottom: 30px; }
+            .stat-box { flex: 1; background: #ecf0f1; padding: 20px; border-radius: 8px; border-left: 5px solid #3498db; }
+            ul { list-style-type: none; padding: 0; }
+            li { padding: 8px 0; border-bottom: 1px solid #ddd; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+            th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+            th { background-color: #3498db; color: white; }
+            tr:hover { background-color: #f5f5f5; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>♟️ Report Analisi Pepite (NuggetsManagement)</h1>
+            <p>Sintesi automatica delle posizioni estratte per elevata tensione WDL.</p>
+            
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <h3>Totale Pepite Estratte</h3>
+                    <p style="font-size: 2em; font-weight: bold; margin: 0; color: #e74c3c;">1678</p>
+                </div>
+                <div class="stat-box">
+                    <h3>Distribuzione per Fase</h3>
+                    <ul><li><strong>Mediogioco:</strong> 1034 pepite</li><li><strong>Transizione Finale:</strong> 275 pepite</li><li><strong>Finale:</strong> 217 pepite</li><li><strong>Apertura:</strong> 81 pepite</li><li><strong>Transizione Mediogioco:</strong> 71 pepite</li></ul>
+                </div>
+                <div class="stat-box">
+                    <h3>Tipi di Centro</h3>
+                    <ul><li><strong>Mobile Center:</strong> 457 pepite</li><li><strong>Dynamic Center (Hanging Pawns):</strong> 389 pepite</li><li><strong>Open Center:</strong> 271 pepite</li><li><strong>Dynamic Center:</strong> 231 pepite</li><li><strong>Closed Center:</strong> 144 pepite</li><li><strong>Dynamic Center (Isolated Queen's Pawn):</strong> 106 pepite</li><li><strong>Closed Center (King's Indian Chain):</strong> 46 pepite</li><li><strong>Closed Center (French Chain):</strong> 34 pepite</li></ul>
+                </div>
+            </div>
+
+            <h2>🔥 Top 10 Pepite più "Insospettabili" (Alta Frequenza)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>FEN</th>
+                        <th>Frequenza (Occorrenze)</th>
+                        <th>WDL Exp.</th>
+                        <th>Delta CP (MultiPV)</th>
+                        <th>Ultima Apparizione</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+        <tr>
+            <td style='font-family: monospace; font-size: 0.9em;'>r2qkbnr/pppb1ppp/2np4/1B2p3/3PP3/5N2/PPP2PPP/RNBQK2R w KQkq - 1 5</td>
+            <td>6</td>
+            <td>0.695</td>
+            <td>19.0</td>
+            <td>1896.12.07</td>
+        </tr>
+        
+        <tr>
+            <td style='font-family: monospace; font-size: 0.9em;'>r2qkbnr/ppp1pppp/2n5/3p4/2PP2b1/5N2/PP2PPPP/RNBQKB1R w KQkq - 1 4</td>
+            <td>3</td>
+            <td>0.717</td>
+            <td>21.0</td>
+            <td>1889.02.19</td>
+        </tr>
+        
+        <tr>
+            <td style='font-family: monospace; font-size: 0.9em;'>r2qkb1r/1ppbnppp/p1np4/4p3/B2PP3/2P2N2/PP3PPP/RNBQK2R w KQkq - 1 7</td>
+            <td>3</td>
+            <td>0.726</td>
+            <td>14.0</td>
+            <td>1948.04.11</td>
+        </tr>
+        
+        <tr>
+            <td style='font-family: monospace; font-size: 0.9em;'>r1b2rk1/2q1bppp/p1np1n2/1pp1p3/3PP3/2P2N1P/PPBN1PP1/R1BQR1K1 w - - 3 13</td>
+            <td>3</td>
+            <td>0.734</td>
+            <td>62.0</td>
+            <td>1957.04.11</td>
+        </tr>
+        
+        <tr>
+            <td style='font-family: monospace; font-size: 0.9em;'>r1bqkb1r/1p3pp1/p1nppn1p/6B1/3NP3/2N5/PPPQ1PPP/2KR1B1R w kq - 0 9</td>
+            <td>3</td>
+            <td>0.711</td>
+            <td>26.0</td>
+            <td>1957.03.23</td>
+        </tr>
+        
+        <tr>
+            <td style='font-family: monospace; font-size: 0.9em;'>r1b1k2r/2q1bppp/p1np1n2/1pp1p3/3PP3/2P2N2/PPBN1PPP/R1BQR1K1 w kq - 3 12</td>
+            <td>2</td>
+            <td>0.79</td>
+            <td>14.0</td>
+            <td>1908.09.01</td>
+        </tr>
+        
+        <tr>
+            <td style='font-family: monospace; font-size: 0.9em;'>r1b2rk1/2q1bppp/p1np1n2/1pp1p3/3PP3/2P2N1P/PPBN1PP1/R1BQR1K1 w - - 1 13</td>
+            <td>2</td>
+            <td>0.746</td>
+            <td>62.0</td>
+            <td>1908.09.01</td>
+        </tr>
+        
+        <tr>
+            <td style='font-family: monospace; font-size: 0.9em;'>r1bqkb1r/1p1n1ppp/2p1pn2/p1Pp4/1P1P4/2N1PN2/P4PPP/R1BQKB1R w KQkq - 0 8</td>
+            <td>2</td>
+            <td>0.724</td>
+            <td>62.0</td>
+            <td>1948.04.15</td>
+        </tr>
+        
+        <tr>
+            <td style='font-family: monospace; font-size: 0.9em;'>r1b1k2r/pp1nqppp/2p1pn2/b2p4/2PP4/P1NBPN2/1PQ2PPP/R1B1K2R w KQkq - 3 9</td>
+            <td>2</td>
+            <td>0.699</td>
+            <td>24.0</td>
+            <td>1948.03.11</td>
+        </tr>
+        
+        <tr>
+            <td style='font-family: monospace; font-size: 0.9em;'>r1b1k2r/pp1nqppp/2p1pn2/b7/2pP4/P1NBPN2/1PQB1PPP/R3K2R w KQkq - 0 10</td>
+            <td>2</td>
+            <td>0.736</td>
+            <td>139.0</td>
+            <td>1948.03.11</td>
+        </tr>
+        
+                </tbody>
+            </table>
+        </div>
+    </body>
+    </html>
+    
