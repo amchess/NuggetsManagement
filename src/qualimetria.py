@@ -2,14 +2,24 @@ import chess
 from enum import Enum
 
 class GamePhase(Enum):
-    APERTURA = "Apertura"
-    MEDIOGIOCO = "Mediogioco"
-    TRANSIZIONE_MEDIOGIOCO = "Transizione Mediogioco"
-    TRANSIZIONE_FINALE = "Transizione Finale"
-    FINALE = "Finale"
+    APERTURA = "Opening"
+    MEDIOGIOCO = "Middlegame"
+    TRANSIZIONE_MEDIOGIOCO = "Transition to middlegame"
+    TRANSIZIONE_FINALE = "Transition to endgame"
+    FINALE = "Endgame"
 
-# Mappa dei valori dei pezzi spostata a livello globale
-PIECE_VALUES = {
+# Pesi specifici dell'algoritmo di Smirnov dal C++
+SMIRNOV_WEIGHTS = {
+    chess.KING: 3.0,
+    chess.QUEEN: 9.9,
+    chess.ROOK: 5.5,
+    chess.BISHOP: 3.5,
+    chess.KNIGHT: 3.1,
+    chess.PAWN: 1.0
+}
+
+# Valori classici usati SOLO per l'asimmetria materiale a fine script
+STANDARD_PIECE_VALUES = {
     chess.KING: 0.0,
     chess.QUEEN: 9.0,
     chess.ROOK: 5.0,
@@ -20,34 +30,33 @@ PIECE_VALUES = {
 
 def get_game_phase(board: chess.Board) -> GamePhase:
     """
-    Determina la fase della partita basata sull'algoritmo di Smirnov.
+    Determina la fase della partita traducendo ESATTAMENTE 
+    l'algoritmo C++ originale di Smirnov.
     """
+    num_tot_unit = len(board.piece_map())
+
     tot_mat_fase = 0.0
-    num_tot_unit = 0
-    
-    for square in chess.SQUARES:
-        piece = board.piece_at(square)
-        if piece:
-            num_tot_unit += 1
-            tot_mat_fase += PIECE_VALUES.get(piece.piece_type, 0.0)
-            
-    num_semi_move = board.ply()
-    
-    if num_semi_move == 0:
-        phase_index = (num_tot_unit * tot_mat_fase) / 0.003
-    else:
-        phase_index = (num_tot_unit * tot_mat_fase) / (3 * (num_semi_move + 0.001))
-        
-    if 0 <= phase_index < 5:
+    for piece in board.piece_map().values():
+        tot_mat_fase += SMIRNOV_WEIGHTS.get(piece.piece_type, 0.0)
+
+    num_semi_move_int = board.ply()
+
+    fase_num = -1.0
+    if num_semi_move_int != 0:
+        fase_num = (num_tot_unit * tot_mat_fase) / (3.0 * (num_semi_move_int + 0.001))
+
+    if 0 <= fase_num < 5:
         return GamePhase.FINALE
-    elif 5 <= phase_index < 10:
+    elif 5 <= fase_num < 10:
         return GamePhase.TRANSIZIONE_FINALE
-    elif 10 <= phase_index < 40:
+    elif 10 <= fase_num < 40:
         return GamePhase.MEDIOGIOCO
-    elif 40 <= phase_index < 50:
+    elif 40 <= fase_num < 50:
         return GamePhase.TRANSIZIONE_MEDIOGIOCO
-    else:
+    elif fase_num >= 50 or fase_num == -1.0:
         return GamePhase.APERTURA
+        
+    return GamePhase.APERTURA
 
 def analyze_center_type(board: chess.Board) -> str:
     """
@@ -160,11 +169,10 @@ def analyze_center_type(board: chess.Board) -> str:
     # 5. Centro DINAMICO: presenza di IQP o Pedoni Sospesi
 
     # --- VERIFICA IQP (Pedone di Donna Isolato) ---
-    # Definizione blindata con maschere assolute Bitboard dal C++:
     # 1. Il pedone amico deve essere in d4 (Bianco) o d5 (Nero).
     # 2. Deve essere l'UNICO pedone amico sulla colonna D.
     # 3. NON ci devono essere pedoni amici sulle colonne C ed E.
-    # 4. NON ci devono essere pedoni avversari sulla colonna D (la colonna deve essere semi-aperta).
+    # 4. NON ci devono essere pedoni avversari sulla colonna D.
     
     w_has_iqp = w_d4 and \
                 (bin(w_pawns & FileDBB).count('1') == 1) and \
@@ -221,6 +229,6 @@ def get_tension(board: chess.Board) -> int:
 
 def get_material_imbalance(board: chess.Board) -> float:
     """Calcola l'asimmetria del materiale."""
-    w_mat = sum(PIECE_VALUES[p.piece_type] for p in board.piece_map().values() if p.color == chess.WHITE)
-    b_mat = sum(PIECE_VALUES[p.piece_type] for p in board.piece_map().values() if p.color == chess.BLACK)
+    w_mat = sum(STANDARD_PIECE_VALUES[p.piece_type] for p in board.piece_map().values() if p.color == chess.WHITE)
+    b_mat = sum(STANDARD_PIECE_VALUES[p.piece_type] for p in board.piece_map().values() if p.color == chess.BLACK)
     return round(abs(w_mat - b_mat), 2)
