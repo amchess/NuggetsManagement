@@ -69,7 +69,6 @@ async def run_worker(worker_id: int, queue: asyncio.Queue, state: StateManager, 
                 score = info["score"].white()
                 if score.is_mate():
                     await state.update_to_not_nugget(fen)
-                    queue.task_done()
                     continue
                 # ---> FINE CORREZIONE <---
 
