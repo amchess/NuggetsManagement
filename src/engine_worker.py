@@ -1,6 +1,7 @@
 import asyncio
 import chess
 import chess.engine
+from chess.svg import board
 from state_manager import StateManager
 import qualimetria
 
@@ -49,7 +50,7 @@ async def run_worker(worker_id: int, queue: asyncio.Queue, state: StateManager, 
             
             # 1. VERIFICA CACHE (Operazione O(1) in RAM, non blocca l'engine)
             # NOTA: Ho mantenuto il tuo metodo 'register_fen' o 'check_or_add_fen' a seconda di come l'hai chiamato in state_manager
-            status = await state.check_or_add_fen(fen, current_date)
+            status = await state.register_fen(fen, current_date)
             if status is not None:
                 # HIT: La FEN era già nota. I contatori (frequenza/data) sono già stati aggiornati.
                 # Non sprechiamo secondi di CPU e passiamo alla prossima mossa!
@@ -110,7 +111,7 @@ async def run_worker(worker_id: int, queue: asyncio.Queue, state: StateManager, 
 
                     # 3.2 Altre Euristiche Matematiche Sincrone
                     fase = qualimetria.get_game_phase(board)
-                    centro = qualimetria.get_center_type(board) # Corretto per combaciare con la tua libreria
+                    centro = qualimetria.analyze_center_type(board)
                     tensione = qualimetria.get_tension(board)
                     imbalance = qualimetria.get_material_imbalance(board)
                     

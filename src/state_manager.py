@@ -2,18 +2,11 @@ import asyncio
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Dict, List
-
+from qualimetria import GamePhase
 class NuggetStatus(Enum):
     PENDING = "Pending"               # In elaborazione
     NOT_NUGGET = "Not Nugget"         # Non rientra nei target WDL
     NUGGET = "Nugget"                 # È una pepita!
-
-class GamePhase(Enum):
-    APERTURA = "Apertura"
-    MEDIOGIOCO = "Mediogioco"
-    TRANSIZIONE_MEDIOGIOCO = "Transizione Mediogioco"
-    TRANSIZIONE_FINALE = "Transizione Finale"
-    FINALE = "Finale"
 
 @dataclass
 class NuggetRecord:
