@@ -11,8 +11,8 @@ def _record_to_dict(record: NuggetRecord) -> dict:
         "status": record.status.value,
         "frequency": record.frequency,
         "last_seen_date": record.last_seen_date,
-        "wdl_expectation": record.wdl_expectation,
-        "delta_multipv": record.delta_multipv,
+        "win_probability": record.win_probability,
+        "delta_win_probability": record.delta_win_probability,
         "fase": record.fase.value if record.fase else None,
         "centro": record.centro,
         "tensione": record.tensione,
@@ -30,9 +30,11 @@ def export_jsonl(nuggets: List[NuggetRecord], filepath: str):
 def export_csv(nuggets: List[NuggetRecord], filepath: str):
     """Esporta i dati in formato CSV tabellare."""
     print(f"[*] Esportazione CSV in corso: {filepath}...")
+    
+    # Header pulito: rimosso Delta_CP
     headers = [
-        "FEN", "WDL", "Delta_CP", "Fase", "Centro", 
-        "Tensione", "Imbalance", "Frequenza", "Data_Recente", "Variante_PGN"
+        "FEN", "WIN_PROBABILITY", "Delta_Win_Probability", "Fase", 
+        "Centro", "Tensione", "Imbalance", "Frequenza", "Data_Recente", "Variante_PGN"
     ]
     
     with open(filepath, 'w', encoding='utf-8', newline='') as f:
@@ -41,12 +43,12 @@ def export_csv(nuggets: List[NuggetRecord], filepath: str):
         for n in nuggets:
             writer.writerow([
                 n.fen,
-                n.wdl_expectation,
-                n.delta_multipv,
+                f"{n.win_probability:.3f}" if n.win_probability is not None else "",
+                f"{n.delta_win_probability:.3f}" if n.delta_win_probability is not None else "",
                 n.fase.value if n.fase else "",
                 n.centro,
                 n.tensione,
-                n.material_imbalance,
+                f"{n.material_imbalance:.1f}" if n.material_imbalance is not None else "",
                 n.frequency,
                 n.last_seen_date,
                 n.variant_pgn
@@ -65,7 +67,7 @@ def export_html_summary(nuggets: List[NuggetRecord], filepath: str):
     fasi_counter = Counter(n.fase.value for n in nuggets if n.fase)
     centri_counter = Counter(n.centro for n in nuggets if n.centro)
     
-    # Ordiniamo le pepite per frequenza per trovare le "Top 10" più insospettabili
+    # Ordiniamo le pepite per frequenza per trovare le "Top 10"
     top_frequent = sorted(nuggets, key=lambda x: x.frequency, reverse=True)[:10]
 
     # Generazione stringhe per le tabelle HTML
@@ -74,17 +76,20 @@ def export_html_summary(nuggets: List[NuggetRecord], filepath: str):
     
     top_html = ""
     for n in top_frequent:
+        wp_str = f"{n.win_probability:.3f}" if n.win_probability is not None else "N/A"
+        dwp_str = f"{n.delta_win_probability:.3f}" if n.delta_win_probability is not None else "N/A"
+        
         top_html += f"""
         <tr>
             <td style='font-family: monospace; font-size: 0.9em;'>{n.fen}</td>
             <td>{n.frequency}</td>
-            <td>{n.wdl_expectation}</td>
-            <td>{n.delta_multipv}</td>
+            <td>{wp_str}</td>
+            <td>{dwp_str}</td>
             <td>{n.last_seen_date}</td>
         </tr>
         """
 
-    # Template HTML con CSS inline per funzionare anche offline senza dipendenze
+    # Template HTML con CSS inline
     html_content = f"""
     <!DOCTYPE html>
     <html lang="it">
@@ -108,7 +113,7 @@ def export_html_summary(nuggets: List[NuggetRecord], filepath: str):
     <body>
         <div class="container">
             <h1>♟️ Report Analisi Pepite (NuggetsManagement)</h1>
-            <p>Sintesi automatica delle posizioni estratte per elevata tensione WDL.</p>
+            <p>Sintesi automatica delle posizioni estratte per elevata tensione della Win Probability.</p>
             
             <div class="stats-grid">
                 <div class="stat-box">
@@ -131,8 +136,8 @@ def export_html_summary(nuggets: List[NuggetRecord], filepath: str):
                     <tr>
                         <th>FEN</th>
                         <th>Frequenza (Occorrenze)</th>
-                        <th>WDL Exp.</th>
-                        <th>Delta CP (MultiPV)</th>
+                        <th>Win Probability</th>
+                        <th>Delta Win Prob.</th>
                         <th>Ultima Apparizione</th>
                     </tr>
                 </thead>

@@ -3,6 +3,7 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Dict, List
 from qualimetria import GamePhase
+
 class NuggetStatus(Enum):
     PENDING = "Pending"               # In elaborazione
     NOT_NUGGET = "Not Nugget"         # Non rientra nei target WDL
@@ -17,8 +18,8 @@ class NuggetRecord:
     last_seen_date: str = "1900-01-01"
     
     # Metriche (Popolate solo se status == NUGGET)
-    wdl_expectation: Optional[float] = None
-    delta_multipv: Optional[float] = None
+    win_probability: Optional[float] = None
+    delta_win_probability: Optional[float] = None
     fase: Optional[GamePhase] = None
     centro: Optional[str] = None
     tensione: Optional[int] = None
@@ -70,9 +71,9 @@ class StateManager:
                 record.status = NuggetStatus.NUGGET
                 record.variant_pgn = variant_pgn
                 
-                # Popola le metriche fornite dal dizionario
-                record.wdl_expectation = metrics.get('wdl_expectation')
-                record.delta_multipv = metrics.get('delta_multipv')
+                # Popola le nuove metriche fornite dal dizionario (senza delta_cp)
+                record.win_probability = metrics.get('win_probability')
+                record.delta_win_probability = metrics.get('delta_win_probability')
                 record.fase = metrics.get('fase')
                 record.centro = metrics.get('centro')
                 record.tensione = metrics.get('tensione')
