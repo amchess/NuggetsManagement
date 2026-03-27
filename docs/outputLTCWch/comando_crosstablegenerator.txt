@@ -1,0 +1,1 @@
+python crosstable_generator.py --pgn RoundRobin_4engines.pgn --anchor-player "Stockfish18" --anchor-elo 3670
