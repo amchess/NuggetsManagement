@@ -1,1 +1,1 @@
-python tournament_visuals.py --pgn ShashChess41vsStockfish18.pgn
+python tournament_visuals.py --pgn RoundRobin_4engines.pgn
