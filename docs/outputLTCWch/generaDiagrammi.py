@@ -63,6 +63,10 @@ for p in ax.patches:
                 ha='center', va='center', fontsize=12, fontweight='bold', xytext=(0, 10), 
                 textcoords='offset points')
 
+# --- INIZIO MODIFICA: Risoluzione etichette sovrapposte ---
+plt.xticks(rotation=45, ha='right', fontsize=12)
+# --- FINE MODIFICA ---
+
 plt.tight_layout()
 plt.savefig('Fig2_Center_Structures.png', dpi=300)
 print("[OK] Saved: Fig2_Center_Structures.png")
