@@ -108,6 +108,6 @@ L'utente finale dovrà semplicemente aprire il config.json, assicurarsi che i pe
 Questo progetto è distribuito sotto licenza **MIT**. Sentiti libero di utilizzarlo, modificarlo e integrarlo nei tuoi progetti (commerciali e non). Vedi il file `LICENSE` per i dettagli.
 
 ## 🎓 Riferimenti Accademici
-Il concetto teorico alla base dell'estrazione WDL e della qualimetria delle pepite ha vinto il primo premio alla conferenza internazionale di Intelligenza Artificiale in Giappone. 
+Il concetto teorico alla base dell'estrazione WDL e della qualimetria delle pepite ha vinto il best paper award alla 24a conferenza internazionale di Entertainment Computing in Giappone. 
 Link al paper: [Springer - 10.1007/978-3-032-02555-5_1](https://link.springer.com/chapter/10.1007/978-3-032-02555-5_1)
 
