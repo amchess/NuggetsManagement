@@ -1,113 +1,114 @@
 # NuggetsManagement ♟️⛏️
 
-**NuggetsManagement** è un software ad alte prestazioni per l'estrazione automatizzata, l'analisi e la classificazione (qualimetria) di "pepite scacchistiche" da enormi database di partite in formato PGN.
+**NuggetsManagement** is a high-performance software for the automated extraction, analysis, and classification (qualimetry) of "chess nuggets" from massive game databases in PGN format.
 
-Il progetto nasce a supporto di una ricerca accademica sulla computer chess (premiata a livello internazionale) e ha lo scopo di fornire dataset di posizioni critiche per l'allenamento umano, il telegioco (correspondence chess) e lo stress-test dei motori UCI basati su reti neurali (NNUE).
+The project was created to support academic research on computer chess (awarded international recognition) and aims to provide datasets of critical positions for human training, correspondence chess, and stress-testing NNUE-based UCI engines.
 
-## 📖 Il Concetto di "Pepita"
-Una **pepita** è definita come una posizione scacchistica caratterizzata da un elevato grado di tensione e complessità dinamica. Invece di basarsi sulla tradizionale valutazione in Centipawn (CP), il software filtra le posizioni utilizzando il modello probabilistico **Win/Draw/Loss (WDL)**.
-Una posizione è considerata una pepita se la probabilità di vittoria (WDL Expectation) per una fazione si attesta su specifici target critici (es. 75% o 25%), con un margine di tolleranza configurabile.
+## 📖 The Concept of a "Nugget"
+A **nugget** is defined as a chess position characterized by a high degree of tension and dynamic complexity. Rather than relying on the traditional Centipawn (CP) evaluation, the software filters positions using the probabilistic **Win/Draw/Loss (WDL)** model.
+A position is considered a nugget if the win probability (WDL Expectation) for one side falls on specific critical targets (e.g., 75% or 25%), with a configurable tolerance margin.
 
-## ✨ Caratteristiche Principali
-* **Elaborazione Asincrona:** Utilizza `asyncio` per lanciare istanze multiple del motore UCI in parallelo, massimizzando l'uso della CPU e abbattendo i tempi di I/O.
-* **Filtro WDL Nativo:** Interroga i motori moderni (come Stockfish 16+) sfruttando l'opzione `UCI_ShowWDL`.
-* **Qualimetria Avanzata:** Calcola metriche complesse a costo computazionale $O(1)$ grazie all'uso dei Bitboard:
-  * *Fase della partita* (Algoritmo di Smirnov basato su materiale e semi-mosse).
-  * *Tipo di Centro* (Aperto, Chiuso, Statico, Mobile, Dinamico con analisi di IQP e pedoni sospesi).
-  * *Tensione Tattica* (conteggio catture legali istantanee).
-  * *Asimmetria di Materiale*.
-* **Qualimetria Storica:** Traccia automaticamente la *Frequenza* (quante volte la pepita si presenta nel database) e la *Recenza* (la data più recente in cui è stata giocata), ignorando le analisi ridondanti grazie a una cache in RAM thread-safe.
-* **Output Strutturato:** Esporta i risultati in formati pronti per l'analisi dati (`.jsonl`, `.csv`).
+## ✨ Key Features
+* **Asynchronous Processing:** Uses `asyncio` to launch multiple UCI engine instances in parallel, maximizing CPU usage and cutting down I/O time.
+* **Native WDL Filter:** Queries modern engines (such as Stockfish 16+) leveraging the `UCI_ShowWDL` option.
+* **Advanced Qualimetry:** Computes complex metrics at $O(1)$ computational cost thanks to the use of Bitboards:
+  * *Game Phase* (Smirnov's algorithm, based on material and half-move count).
+  * *Center Type* (Open, Closed, Static, Mobile, Dynamic, with IQP and hanging pawns analysis).
+  * *Tactical Tension* (count of instantaneous legal captures).
+  * *Material Asymmetry*.
+* **Historical Qualimetry:** Automatically tracks *Frequency* (how many times the nugget appears in the database) and *Recency* (the most recent date it was played), skipping redundant analyses thanks to a thread-safe in-RAM cache.
+* **Structured Output:** Exports results in formats ready for data analysis (`.jsonl`, `.csv`).
 
-## 🛠️ Prerequisiti
-* **Motore UCI:** Un eseguibile di Stockfish (versione 16 o superiore) con supporto NNUE.
-* Per lo sviluppo dal codice sorgente: **Python 3.9+**.
+## 🛠️ Prerequisites
+* **UCI Engine:** A Stockfish executable (version 16 or higher) with NNUE support.
+* For development from source code: **Python 3.9+**.
 
-## 🚀 Installazione (Sviluppo)
-Se desideri eseguire il software dal codice sorgente o modificarlo:
+## 🚀 Installation (Development)
+If you want to run the software from source code or modify it:
 
-1. Clona il repository:
+1. Clone the repository:
    ```bash
-   git clone [https://github.com/TUO-USERNAME/NuggetsManagement.git](https://github.com/TUO-USERNAME/NuggetsManagement.git)
+   git clone [https://github.com/YOUR-USERNAME/NuggetsManagement.git](https://github.com/YOUR-USERNAME/NuggetsManagement.git)
    cd NuggetsManagement
    ```
-2. Crea e attiva un ambiente virtuale:
+2. Create and activate a virtual environment:
    ```bash
-	python -m venv venv
-	# Su Windows:
-	venv\Scripts\activate
-	# Su Linux/macOS:
-	source venv/bin/activate
-	```
-3. Installa le dipendenze:
-	```bash
-	pip install -r requirements.txt
-	```
-## ▶️ Esecuzione del Programma (Sorgente)
-Una volta impostati i parametri nel file `config.json` e attivato l'ambiente virtuale, assicurati di trovarti nella directory principale del progetto e lancia il seguente comando dal terminale:
+   python -m venv venv
+   # On Windows:
+   venv\Scripts\activate
+   # On Linux/macOS:
+   source venv/bin/activate
+   ```
+3. Install the dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## ▶️ Running the Program (Source)
+Once you've set the parameters in the `config.json` file and activated the virtual environment, make sure you're in the project's root directory and run the following command from the terminal:
 
 ```bash
 python src/main.py
 ```
 
-## ⚙️ Configurazione (`config.json`)
-Il comportamento del software è interamente gestito tramite il file `config.json` situato nella root del progetto. Prima di avviare l'analisi, assicurati di compilare questi parametri:
+## ⚙️ Configuration (`config.json`)
+The software's behavior is entirely managed through the `config.json` file located in the project root. Before starting the analysis, make sure to fill in these parameters:
 
-* `engine_path`: Il percorso assoluto o relativo all'eseguibile del motore UCI (es. `"C:\\percorsi\\stockfish.exe"` su Windows o `"stockfish"` su Linux se è nel PATH).
-* `pgn_path`: Il percorso del file PGN contenente il database di partite da analizzare (es. `"data/partite.pgn"`).
-* `output_dir`: La cartella dove verranno salvati i report finali (JSONL, CSV, HTML).
-* `concurrency`: Il numero di processi motore da lanciare in parallelo. Impostalo in base ai core fisici della tua CPU (es. `4` o `8`).
-* `analysis_time`: Il tempo in secondi dedicato all'analisi WDL (e MultiPV) per ogni singola posizione (es. `1.0`).
-* `wdl_tolerance`: Il margine di tolleranza rispetto ai target WDL (75% e 25%). Ad esempio, `0.06` significa una tolleranza del $\pm$ 6% (catturerà valori tra 69% e 81%).
-* `threads`: Il numero di thread CPU allocati per *singola* istanza del motore (es. `1`). Attenzione: il numero totale di thread usati sarà `concurrency * threads`.
-* `hash`: La dimensione della Hash Table (in MB) allocata per singola istanza (es. `64`).
-* `syzygy_path`: (Opzionale) Il percorso alle tablebases dei finali (es. `"C:\\syzygy"`). Lasciare vuoto `""` se non utilizzato.
-  
-## 📦 Generazione dell'Eseguibile (Standalone)
+* `engine_path`: The absolute or relative path to the UCI engine executable (e.g., `"C:\\paths\\stockfish.exe"` on Windows, or `"stockfish"` on Linux if it's in the PATH).
+* `pgn_path`: The path to the PGN file containing the games database to analyze (e.g., `"data/games.pgn"`).
+* `output_dir`: The folder where the final reports (JSONL, CSV, HTML) will be saved.
+* `concurrency`: The number of engine processes to launch in parallel. Set it based on your CPU's physical cores (e.g., `4` or `8`).
+* `analysis_time`: The time in seconds dedicated to WDL (and MultiPV) analysis for each individual position (e.g., `1.0`).
+* `wdl_tolerance`: The tolerance margin relative to the WDL targets (75% and 25%). For example, `0.06` means a tolerance of $\pm$ 6% (it will capture values between 69% and 81%).
+* `threads`: The number of CPU threads allocated per *single* engine instance (e.g., `1`). Note: the total number of threads used will be `concurrency * threads`.
+* `hash`: The size of the Hash Table (in MB) allocated per instance (e.g., `64`).
+* `syzygy_path`: (Optional) The path to the endgame tablebases (e.g., `"C:\\syzygy"`). Leave empty `""` if not used.
 
-Puoi compilare NuggetsManagement in un unico file eseguibile per distribuirlo senza costringere l'utente finale a installare Python o configurare un ambiente virtuale. Utilizziamo `pyinstaller`.
+## 📦 Generating the Executable (Standalone)
 
-**⚠️ Nota importante:** La compilazione non è cross-platform. Per generare un `.exe` per Windows devi eseguire il comando su Windows. Per generare un binario Linux, devi eseguirlo su Linux.
+You can compile NuggetsManagement into a single executable file to distribute it without requiring the end user to install Python or set up a virtual environment. We use `pyinstaller`.
 
-### 1. Preparazione
-Assicurati di avere il tuo ambiente virtuale (`.venv`) attivato, poiché PyInstaller ha bisogno di "vedere" le librerie installate (come `python-chess`).
+**⚠️ Important note:** Compilation is not cross-platform. To generate a `.exe` for Windows, you must run the command on Windows. To generate a Linux binary, you must run it on Linux.
+
+### 1. Preparation
+Make sure your virtual environment (`.venv`) is activated, since PyInstaller needs to "see" the installed libraries (such as `python-chess`).
 ```bash
 pip install pyinstaller
 ```
-### 2. Compilazione
-Esegui il comando corrispondente al tuo sistema operativo dalla cartella radice del progetto:
 
-**Su Windows:**
+### 2. Compilation
+Run the command corresponding to your operating system from the project's root folder:
+
+**On Windows:**
 ```bash
 pyinstaller --onefile --name NuggetsManagement src/main.py
 ```
-**Su Linux:**
+**On Linux:**
 ```bash
 pyinstaller --onefile --name NuggetsManagement_linux src/main.py
 ```
-(Su Linux, ricordati di dare i permessi di esecuzione al file generato con chmod +x dist/NuggetsManagement_linux).
+(On Linux, remember to grant execution permissions to the generated file with chmod +x dist/NuggetsManagement_linux.)
 
-### 3. Come distribuire il software
-PyInstaller impacchetta il codice Python, ma non include i file esterni per scelta architettonica (vogliamo che l'utente possa cambiare le impostazioni senza ricompilare).
+### 3. How to Distribute the Software
+PyInstaller packages the Python code but does not include external files, by architectural choice (we want the user to be able to change settings without recompiling).
 
-Per distribuire il programma, crea una cartella e inserisci i seguenti file, prelevando l'eseguibile appena creato dalla cartella dist/:
+To distribute the program, create a folder and place the following files in it, taking the executable you just built from the dist/ folder:
 
 ```text
 NuggetsManagement_Release/
 │
-├── NuggetsManagement.exe    <-- Il file compilato (da dist/)
-├── config.json              <-- Il file di configurazione
-├── stockfish.exe            <-- Il motore scacchistico
-└── data/                    <-- La cartella con i PGN da analizzare
-    └── partite.pgn
+├── NuggetsManagement.exe    <-- The compiled file (from dist/)
+├── config.json              <-- The configuration file
+├── stockfish.exe            <-- The chess engine
+└── data/                    <-- The folder with the PGNs to analyze
+    └── games.pgn
 ```
 
-L'utente finale dovrà semplicemente aprire il config.json, assicurarsi che i percorsi siano corretti e fare doppio clic sull'eseguibile!
+The end user will simply need to open config.json, make sure the paths are correct, and double-click the executable!
 
-## 📄 Licenza
-Questo progetto è distribuito sotto licenza **MIT**. Sentiti libero di utilizzarlo, modificarlo e integrarlo nei tuoi progetti (commerciali e non). Vedi il file `LICENSE` per i dettagli.
+## 📄 License
+This project is distributed under the **MIT** license. Feel free to use, modify, and integrate it into your projects (commercial and non-commercial). See the `LICENSE` file for details.
 
-## 🎓 Riferimenti Accademici
-Il concetto teorico alla base dell'estrazione WDL e della qualimetria delle pepite ha vinto il primo premio alla conferenza internazionale di Intelligenza Artificiale in Giappone. 
-Link al paper: [Springer - 10.1007/978-3-032-02555-5_1](https://link.springer.com/chapter/10.1007/978-3-032-02555-5_1)
-
+## 🎓 Academic References
+The theoretical concept underlying WDL extraction and nugget qualimetry won first prize at an international Artificial Intelligence conference in Japan.
+Paper link: [Springer - 10.1007/978-3-032-02555-5_1](https://link.springer.com/chapter/10.1007/978-3-032-02555-5_1)
