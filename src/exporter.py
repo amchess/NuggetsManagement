@@ -13,6 +13,8 @@ def _record_to_dict(record: NuggetRecord) -> dict:
         "last_seen_date": record.last_seen_date,
         "win_probability": record.win_probability,
         "delta_win_probability": record.delta_win_probability,
+        "wdl_1": list(record.wdl_1) if record.wdl_1 else None,
+        "wdl_2": list(record.wdl_2) if record.wdl_2 else None,
         "fase": record.fase.value if record.fase else None,
         "centro": record.centro,
         "tensione": record.tensione,
@@ -34,7 +36,8 @@ def export_csv(nuggets: List[NuggetRecord], filepath: str):
     # Header pulito: rimosso Delta_CP
     headers = [
         "FEN", "WIN_PROBABILITY", "Delta_Win_Probability", "Fase", 
-        "Centro", "Tensione", "Imbalance", "Frequenza", "Data_Recente", "Variante_PGN"
+        "Centro", "Tensione", "Imbalance", "Frequenza", "Data_Recente", "Variante_PGN",
+        "W1", "D1", "L1", "W2", "D2", "L2"
     ]
     
     with open(filepath, 'w', encoding='utf-8', newline='') as f:
@@ -51,7 +54,9 @@ def export_csv(nuggets: List[NuggetRecord], filepath: str):
                 f"{n.material_imbalance:.1f}" if n.material_imbalance is not None else "",
                 n.frequency,
                 n.last_seen_date,
-                n.variant_pgn
+                n.variant_pgn,
+                *([f"{x:.3f}" for x in n.wdl_1] if n.wdl_1 else ["", "", ""]),
+                *([f"{x:.3f}" for x in n.wdl_2] if n.wdl_2 else ["", "", ""])
             ])
 
 def export_html_summary(nuggets: List[NuggetRecord], filepath: str):

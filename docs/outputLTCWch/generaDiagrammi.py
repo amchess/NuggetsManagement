@@ -1,9 +1,21 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import argparse
 
-print("[*] Loading dataset: nuggets.csv ...")
-df = pd.read_csv('nuggets.csv')
+# Uso: python generaDiagrammi.py [--csv nuggets.csv] [--label Pool] [--threshold 0.03]
+# Le figure descrivono il file passato con --csv: usare --label per distinguere
+# il pool completo dalla selezione Top-100 (i nomi dei file PNG includono l'etichetta).
+_p = argparse.ArgumentParser(description="Nugget dataset charts")
+_p.add_argument("--csv", default="nuggets.csv")
+_p.add_argument("--label", default="Pool")
+_p.add_argument("--threshold", type=float, default=0.03, help="Delta WDL threshold drawn in Chart 4")
+args = _p.parse_args()
+
+print(f"[*] Loading dataset: {args.csv} ...")
+df = pd.read_csv(args.csv)
+N = len(df)
+TAG = f"{args.label}, n={N}"
 
 # --- AUTO-FIX COLUMN NAMES ---
 # This ensures the script works even if columns are 'WIN_PROBABILITY' or 'Win_Probability'
@@ -40,10 +52,10 @@ plt.pie(fasi_counts, labels=fasi_counts.index, autopct=autopct_format(fasi_count
         explode=[0.05 if label == "Middlegame" else 0 for label in fasi_counts.index],
         textprops={'fontsize': 12, 'fontweight': 'bold'})
 
-plt.title('Nugget Distribution by Game Phase', fontsize=16, fontweight='bold', pad=20)
+plt.title(f'Nugget Distribution by Game Phase ({TAG})', fontsize=16, fontweight='bold', pad=20)
 plt.tight_layout()
-plt.savefig('Fig1_Phase_Distribution.png', dpi=300)
-print("[OK] Saved: Fig1_Phase_Distribution.png")
+plt.savefig(f'Fig1_Phase_Distribution_{args.label}.png', dpi=300)
+print(f"[OK] Saved: Fig1_Phase_Distribution_{args.label}.png")
 
 # ---------------------------------------------------------
 # CHART 2: Pawn Center Structures (Bar Chart)
@@ -54,7 +66,7 @@ centri_counts = df['Centro'].value_counts()
 # Fixed palette warning by assigning hue
 ax = sns.barplot(x=centri_counts.index, y=centri_counts.values, hue=centri_counts.index, palette="magma", edgecolor='black', legend=False)
 
-plt.title('Strategic Context: Pawn Center Structures', fontsize=16, fontweight='bold', pad=15)
+plt.title(f'Pawn Center Structures ({TAG})', fontsize=16, fontweight='bold', pad=15)
 plt.xlabel('Center Type', fontsize=14)
 plt.ylabel('Number of Positions', fontsize=14)
 
@@ -68,8 +80,8 @@ plt.xticks(rotation=45, ha='right', fontsize=12)
 # --- FINE MODIFICA ---
 
 plt.tight_layout()
-plt.savefig('Fig2_Center_Structures.png', dpi=300)
-print("[OK] Saved: Fig2_Center_Structures.png")
+plt.savefig(f'Fig2_Center_Structures_{args.label}.png', dpi=300)
+print(f"[OK] Saved: Fig2_Center_Structures_{args.label}.png")
 
 # ---------------------------------------------------------
 # CHART 3: Indecision Map (Scatter Plot)
@@ -82,14 +94,14 @@ sns.scatterplot(data=df, x='Win_Probability', y='Delta_Win_Probability',
 plt.axvline(x=0.25, color='gray', linestyle='--', alpha=0.5, label='Black Target (0.25)')
 plt.axvline(x=0.75, color='gray', linestyle='--', alpha=0.5, label='White Target (0.75)')
 
-plt.title('Indecision Map: Win Probability vs MultiPV Delta', fontsize=16, fontweight='bold', pad=15)
-plt.xlabel('Win Probability (NNUE)', fontsize=14)
+plt.title(f'Indecision Map: Win Probability vs MultiPV Delta ({TAG})', fontsize=16, fontweight='bold', pad=15)
+plt.xlabel('Win Probability, White point of view (W + D/2)', fontsize=14)
 plt.ylabel('Delta Win Probability (Line 1 vs Line 2)', fontsize=14)
 plt.legend(title='Game Phase', bbox_to_anchor=(1.05, 1), loc='upper left')
 
 plt.tight_layout()
-plt.savefig('Fig3_Indecision_Scatter.png', dpi=300, bbox_inches='tight')
-print("[OK] Saved: Fig3_Indecision_Scatter.png")
+plt.savefig(f'Fig3_Indecision_Scatter_{args.label}.png', dpi=300, bbox_inches='tight')
+print(f"[OK] Saved: Fig3_Indecision_Scatter_{args.label}.png")
 
 # ---------------------------------------------------------
 # CHART 4: Mathematical Tolerance (Delta WDL Histogram)
@@ -98,16 +110,16 @@ plt.figure(figsize=(10, 6))
 
 sns.histplot(data=df, x='Delta_Win_Probability', bins=15, kde=True, color='indigo')
 
-plt.title('Mathematical Indecision Distribution (Delta WDL)', fontsize=16, fontweight='bold', pad=15)
+plt.title(f'Delta WDL Distribution ({TAG})', fontsize=16, fontweight='bold', pad=15)
 plt.xlabel('Delta Win Probability', fontsize=14)
 plt.ylabel('Number of Positions (Nuggets)', fontsize=14)
 
-plt.axvline(x=0.03, color='red', linestyle=':', linewidth=2, label='Selection Threshold (0.03)')
+plt.axvline(x=args.threshold, color='red', linestyle=':', linewidth=2, label=f'Delta WDL = {args.threshold}')
 plt.legend()
 
 plt.tight_layout()
-plt.savefig('Fig4_Delta_Distribution.png', dpi=300)
-print("[OK] Saved: Fig4_Delta_Distribution.png")
+plt.savefig(f'Fig4_Delta_Distribution_{args.label}.png', dpi=300)
+print(f"[OK] Saved: Fig4_Delta_Distribution_{args.label}.png")
 
 print("==================================================")
 print(" Nugget analysis visuals completed successfully! ")

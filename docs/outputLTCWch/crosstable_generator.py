@@ -22,9 +22,8 @@ def calculate_elos(player_scores, h2h_games, base_elo=3550.0, iterations=1000, a
     for _ in range(iterations):
         new_ratings = {}
         for p1 in ratings:
-            # Laplace smoothing: prevents infinity for 100% or 0% score rates
-            actual = player_scores[p1] + 0.5 
-            expected = 0.5 
+            actual = player_scores[p1]
+            expected = 0.0
             
             for p2 in ratings:
                 if p1 != p2:
@@ -105,6 +104,11 @@ def main():
 
     if games_count == 0:
         print("[!] No valid games found to analyze.")
+        return
+
+    if args.anchor_player and args.anchor_player not in player_scores:
+        print(f"[ERROR] Anchor player '{args.anchor_player}' not found in the PGN. "
+              f"Players: {sorted(player_scores)}. Use --anchor-player with the exact name.")
         return
 
     elos = calculate_elos(

@@ -1,92 +1,110 @@
+"""
+Selezione delle Top-N pepite da nuggets.csv e scrittura di:
+  - nuggets_top100.pgn  (linea completa fino alla pepita, nessun troncamento)
+  - nuggets_top100.epd  (posizione finale: libro di aperture per i tornei)
+  - nuggets_top100.csv  (le righe scelte, per i diagrammi della selezione)
+
+Regola (dichiarata e riproducibile):
+  1. |Pwin - bersaglio| <= --pwin-tol  (bersaglio 0.75 oppure 0.25)
+  2. Delta WDL <= --delta-tol
+  3. se il CSV contiene le colonne W1/L1: L1 <= --opposite-max per le pepite a 0.75,
+     W1 <= --opposite-max per quelle a 0.25
+  4. ordinamento per Delta WDL crescente, poi per distanza di Pwin dal bersaglio
+  5. una sola pepita per linea di partita: si scarta una posizione se la sua linea
+     e' il prefisso (per mosse intere) di una gia' scelta, o viceversa
+
+Uso:  python genera_pgn.py [--csv nuggets.csv] [--n 100]
+"""
+import argparse
+import re
 import pandas as pd
 
-print("Caricamento dataset...")
-df = pd.read_csv('nuggets.csv')
 
-# Rimuovi eventuali duplicati esatti di FEN
-df = df.drop_duplicates(subset=['FEN']).copy()
+def get_args():
+    p = argparse.ArgumentParser(description="Selezione Top-N pepite")
+    p.add_argument("--csv", default="nuggets.csv")
+    p.add_argument("--n", type=int, default=100)
+    p.add_argument("--pwin-tol", type=float, default=0.03)
+    p.add_argument("--delta-tol", type=float, default=0.03)
+    p.add_argument("--opposite-max", type=float, default=0.0)
+    p.add_argument("--out", default="nuggets_top100")
+    return p.parse_args()
 
-# --- NUOVO FILTRO GLOBALE: Mantiene solo le pepite più profonde (nodi foglia) ---
-print("Filtraggio dell'albero delle varianti per mantenere solo le linee più profonde...")
-df['Variante_PGN'] = df['Variante_PGN'].astype(str).str.strip()
-df['pgn_len'] = df['Variante_PGN'].str.len()
 
-# Ordiniamo per lunghezza decrescente: le varianti con più mosse vengono prima
-df_sorted = df.sort_values(by='pgn_len', ascending=False)
+def moves(variant: str) -> tuple:
+    """Lista di mosse senza numeri di mossa: confronto per mosse intere, non per caratteri."""
+    return tuple(t for t in re.sub(r"\d+\.", " ", str(variant)).split())
 
-keep_indices = []
-kept_pgns = []
 
-for idx, row in df_sorted.iterrows():
-    current_pgn = row['Variante_PGN']
-    
-    # Controlliamo se questa variante (essendo più corta) è solo l'inizio di una più lunga già tenuta
-    is_subset = False
-    for kept in kept_pgns:
-        if kept.startswith(current_pgn):
-            is_subset = True
+def related(a: tuple, b: tuple) -> bool:
+    """True se una linea e' il prefisso dell'altra (stessa partita o stessa variante)."""
+    n = min(len(a), len(b))
+    return a[:n] == b[:n]
+
+
+def main():
+    args = get_args()
+    df = pd.read_csv(args.csv).drop_duplicates(subset=["FEN"]).copy()
+    df = df.rename(columns={"WIN_PROBABILITY": "Pwin", "Delta_Win_Probability": "Delta"})
+    for col in ("Pwin", "Delta"):
+        if col not in df.columns:
+            raise SystemExit(f"[ERRORE] Colonna mancante nel CSV: {col}")
+    print(f"[*] Pepite candidate nel CSV: {len(df)}")
+
+    df["Target"] = df["Pwin"].apply(lambda p: 0.75 if p >= 0.5 else 0.25)
+    df["Dist"] = (df["Pwin"] - df["Target"]).abs().round(3)
+
+    df = df[(df["Dist"] <= args.pwin_tol + 1e-9) & (df["Delta"] <= args.delta_tol + 1e-9)]
+    print(f"[*] Dopo le tolleranze (Pwin ±{args.pwin_tol}, Delta ≤ {args.delta_tol}): {len(df)}")
+
+    if {"W1", "L1"}.issubset(df.columns):
+        ok_high = (df["Target"] == 0.75) & (df["L1"] <= args.opposite_max + 1e-9)
+        ok_low = (df["Target"] == 0.25) & (df["W1"] <= args.opposite_max + 1e-9)
+        df = df[ok_high | ok_low]
+        print(f"[*] Dopo la condizione L=0 / W=0 (max {args.opposite_max}): {len(df)}")
+    else:
+        print("[!] Colonne W1/L1 assenti: condizione L=0 / W=0 NON verificata (CSV di vecchio formato).")
+
+    df = df.sort_values(by=["Delta", "Dist", "FEN"], kind="mergesort")
+
+    selection, chosen_lines = [], []
+    for _, row in df.iterrows():
+        line = moves(row["Variante_PGN"])
+        if any(related(line, c) for c in chosen_lines):
+            continue
+        selection.append(row)
+        chosen_lines.append(line)
+        if len(selection) >= args.n:
             break
-            
-    if not is_subset:
-        keep_indices.append(idx)
-        kept_pgns.append(current_pgn)
 
-# Ora abbiamo un dataset purissimo: nessuna pepita è la prosecuzione di un'altra.
-df_clean = df.loc[keep_indices].copy()
-print(f"Riduzione completata: da {len(df)} a {len(df_clean)} pepite strutturalmente indipendenti.")
+    print(f"[*] Pepite selezionate (una per linea): {len(selection)}")
+    if len(selection) < args.n:
+        print(f"[!] Meno di {args.n} pepite soddisfano la regola: allargare le tolleranze o il database.")
+
+    with open(args.out + ".pgn", "w", encoding="utf-8") as fp, \
+         open(args.out + ".epd", "w", encoding="utf-8") as fe:
+        for i, row in enumerate(selection, 1):
+            date = str(row["Data_Recente"])
+            if date.startswith("1900") or date == "nan":
+                date = "????.??.??"          # data ignota: mai una data fittizia
+            fp.write('[Event "Nuggets Top-N"]\n[Site "NuggetsManagement"]\n')
+            fp.write(f'[Date "{date}"]\n[Round "{i}"]\n[White "?"]\n[Black "?"]\n[Result "*"]\n')
+            fp.write(f'[NuggetFEN "{row["FEN"]}"]\n')
+            fp.write(f'[Pwin "{row["Pwin"]:.3f}"]\n[DeltaWDL "{row["Delta"]:.3f}"]\n')
+            if {"W1", "D1", "L1"}.issubset(row.index):
+                fp.write(f'[WDL "{row["W1"]:.3f} {row["D1"]:.3f} {row["L1"]:.3f}"]\n')
+            fp.write(f'[Phase "{row["Fase"]}"]\n[Centre "{row["Centro"]}"]\n\n')
+            fp.write(f'{str(row["Variante_PGN"]).strip()} *\n\n')
+            epd = " ".join(str(row["FEN"]).split()[:4])
+            fe.write(f'{epd} id "nugget{i:03d}"; c0 "Pwin={row["Pwin"]:.3f} DeltaWDL={row["Delta"]:.3f}";\n')
+
+    # CSV della selezione: serve a generaDiagrammi.py --csv <out>.csv --label Top100
+    pd.DataFrame(selection).rename(
+        columns={"Pwin": "WIN_PROBABILITY", "Delta": "Delta_Win_Probability"}
+    ).drop(columns=["Target", "Dist"]).to_csv(args.out + ".csv", index=False)
+
+    print(f"[OK] Scritti {args.out}.pgn, {args.out}.epd e {args.out}.csv")
 
 
-# --- SELEZIONE DELLE 100 PEPITE (ora peschiamo dal dataset pulito) ---
-selection = []
-selected_fens = set()
-
-def add_to_selection(subset_df, limit, category_name):
-    count = 0
-    for _, row in subset_df.iterrows():
-        if count >= limit:
-            break
-        if row['FEN'] not in selected_fens:
-            row_dict = row.to_dict()
-            row_dict['Categoria'] = category_name
-            selection.append(row_dict)
-            selected_fens.add(row['FEN'])
-            count += 1
-
-# 1. Top 20 Storiche (Frequenza maggiore)
-freq_df = df_clean.sort_values(by='Frequenza', ascending=False)
-add_to_selection(freq_df, 20, "Frequenza Storica")
-
-# 2. Top 40 Tattiche (Delta CP più alto)
-tactical_df = df_clean.sort_values(by='Delta_CP', ascending=False)
-add_to_selection(tactical_df, 40, "Tattica Estrema (Alto Delta CP)")
-
-# 3. Top 40 Posizionali (Delta CP più basso, a partire da 0.0)
-positional_df = df_clean.sort_values(by='Delta_CP', ascending=True)
-add_to_selection(positional_df, 40, "Dominio Posizionale (Basso Delta CP)")
-
-# Integrazione se necessario per arrivare a 100
-if len(selection) < 100:
-    remaining_df = df_clean[~df_clean['FEN'].isin(selected_fens)].sort_values(by='Tensione', ascending=False)
-    add_to_selection(remaining_df, 100 - len(selection), "Integrazione Qualimetrica")
-
-print(f"Estrazione completata: {len(selection)} pepite definitive selezionate.")
-print("Scrittura del file PGN in corso...")
-
-# Generazione del file PGN finale
-with open('nuggets_top100.pgn', 'w', encoding='utf-8') as f:
-    for i, row in enumerate(selection, 1):
-        date = row['Data_Recente'] if pd.notna(row['Data_Recente']) else "????.??.??"
-        variante = row['Variante_PGN']
-        
-        f.write(f'[Event "Nuggets Test Suite - {row["Categoria"]}"]\n')
-        f.write(f'[Site "NuggetsManagement"]\n')
-        f.write(f'[Date "{date}"]\n')
-        f.write(f'[Round "{i}"]\n')
-        f.write(f'[White "Motore Test (Bianco)"]\n')
-        f.write(f'[Black "Motore Test (Nero)"]\n')
-        f.write(f'[Result "*"]\n')
-        f.write(f'[Annotator "Fase: {row["Fase"]} | Centro: {row["Centro"]} | Delta CP: {row["Delta_CP"]} | WDL: {row["WDL"]}"]\n')
-        f.write(f'[Target_FEN "{row["FEN"]}"]\n\n')
-        f.write(f'{variante} *\n\n')
-
-print("[OK] File 'nuggets_top100.pgn' generato con successo e ottimizzato!")
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,1605 @@
+================================================================================
+   ESPORTAZIONE COMPLETA SORGENTI SHASHGUI
+================================================================================
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: docs\outputLTCWch\crosstable_generator.py
+////////////////////////////////////////////////////////////////////////////////
+
+import chess.pgn
+import argparse
+from collections import defaultdict
+
+def get_args():
+    parser = argparse.ArgumentParser(description="PGN Crosstable and Elo Estimator")
+    parser.add_argument("--pgn", type=str, required=True, help="Path to the PGN file to analyze")
+    parser.add_argument("--base-elo", type=float, default=3550.0, help="Base average Elo if no anchor is used (default: 3550)")
+    parser.add_argument("--anchor-player", type=str, default="Stockfish18", help="Name of the player to anchor the Elo rating (e.g., 'Stockfish18')")
+    parser.add_argument("--anchor-elo", type=float, default=3600.0, help="Official Elo rating of the anchor player (default: 3600)")
+    return parser.parse_args()
+
+def calculate_elos(player_scores, h2h_games, base_elo=3550.0, iterations=1000, anchor_player=None, anchor_elo=3600.0):
+    """
+    Iteratively calculates the Elo rating using the Bradley-Terry model.
+    Uses a decaying learning rate to guarantee perfect mathematical convergence.
+    Anchors a specific player to a known official Elo rating to calibrate the scale.
+    """
+    ratings = {p: base_elo for p in player_scores}
+    lr = 10.0  # Initial learning rate
+    
+    for _ in range(iterations):
+        new_ratings = {}
+        for p1 in ratings:
+            actual = player_scores[p1]
+            expected = 0.0
+            
+            for p2 in ratings:
+                if p1 != p2:
+                    n = h2h_games[p1][p2]
+                    if n > 0:
+                        expected += n / (1.0 + 10 ** ((ratings[p2] - ratings[p1]) / 400.0))
+            
+            new_ratings[p1] = ratings[p1] + lr * (actual - expected)
+        
+        # Recenter ratings
+        if anchor_player and anchor_player in new_ratings:
+            # Shift everyone so that the anchor player has exactly the target Elo
+            offset = anchor_elo - new_ratings[anchor_player]
+        else:
+            # Fallback to average centering
+            avg_rating = sum(new_ratings.values()) / len(new_ratings)
+            offset = base_elo - avg_rating
+            
+        ratings = {p: r + offset for p, r in new_ratings.items()}
+        
+        # Decay learning rate for smooth convergence
+        lr *= 0.99
+        
+    return ratings
+
+def main():
+    args = get_args()
+    pgn_path = args.pgn
+
+    print(f"[*] Reading PGN file: {pgn_path} ...")
+
+    player_scores = defaultdict(float)
+    player_stats = defaultdict(lambda: {"W": 0, "D": 0, "L": 0})
+    h2h_scores = defaultdict(lambda: defaultdict(float))
+    h2h_games = defaultdict(lambda: defaultdict(int))
+
+    games_count = 0
+
+    try:
+        with open(pgn_path, "r", encoding="utf-8", errors="ignore") as f:
+            while True:
+                headers = chess.pgn.read_headers(f)
+                if headers is None:
+                    break
+                
+                white = headers.get("White", "?")
+                black = headers.get("Black", "?")
+                result = headers.get("Result", "*")
+                
+                if result == "1-0":
+                    w_score, b_score = 1.0, 0.0
+                    player_stats[white]["W"] += 1
+                    player_stats[black]["L"] += 1
+                elif result == "0-1":
+                    w_score, b_score = 0.0, 1.0
+                    player_stats[white]["L"] += 1
+                    player_stats[black]["W"] += 1
+                elif result == "1/2-1/2":
+                    w_score, b_score = 0.5, 0.5
+                    player_stats[white]["D"] += 1
+                    player_stats[black]["D"] += 1
+                else:
+                    continue
+                
+                player_scores[white] += w_score
+                player_scores[black] += b_score
+                
+                h2h_scores[white][black] += w_score
+                h2h_scores[black][white] += b_score
+                h2h_games[white][black] += 1
+                h2h_games[black][white] += 1
+                
+                games_count += 1
+
+    except FileNotFoundError:
+        print(f"[ERROR] File '{pgn_path}' not found.")
+        return
+
+    if games_count == 0:
+        print("[!] No valid games found to analyze.")
+        return
+
+    if args.anchor_player and args.anchor_player not in player_scores:
+        print(f"[ERROR] Anchor player '{args.anchor_player}' not found in the PGN. "
+              f"Players: {sorted(player_scores)}. Use --anchor-player with the exact name.")
+        return
+
+    elos = calculate_elos(
+        player_scores, 
+        h2h_games, 
+        base_elo=args.base_elo, 
+        anchor_player=args.anchor_player, 
+        anchor_elo=args.anchor_elo
+    )
+
+    sorted_players = sorted(player_scores.keys(), key=lambda p: (player_scores[p], elos[p]), reverse=True)
+    num_players = len(sorted_players)
+
+    print(f"[*] Successfully processed {games_count} games.")
+    print("\n" + "="*105)
+    print(" " * 42 + "TOURNAMENT CROSSTABLE")
+    print("="*105)
+
+    header_str = f"{'Rank':<4} | {'Engine / Player':<22} | {'Est. Elo':<8} | {'Score':<6} | {'W-D-L':<15} | "
+    header_str += " | ".join([f"{i+1:^5}" for i in range(num_players)])
+    print(header_str)
+    print("-" * 105)
+
+    for i, p1 in enumerate(sorted_players):
+        score = player_scores[p1]
+        elo = int(round(elos[p1]))
+        w = player_stats[p1]["W"]
+        d = player_stats[p1]["D"]
+        l = player_stats[p1]["L"]
+        wdl_str = f"+{w} ={d} -{l}"
+        
+        row_str = f"{i+1:<4} | {p1:<22} | {elo:<8} | {score:<6.1f} | {wdl_str:<15} | "
+        
+        cells = []
+        for j, p2 in enumerate(sorted_players):
+            if i == j:
+                cells.append("  X  ")
+            else:
+                pts = h2h_scores[p1][p2]
+                played = h2h_games[p1][p2]
+                if played == 0:
+                    cells.append("  -  ")
+                else:
+                    cells.append(f"{pts:>4.1f} ")
+        
+        row_str += " | ".join(cells)
+        print(row_str)
+
+    print("="*105 + "\n")
+
+if __name__ == "__main__":
+    main()
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: docs\outputLTCWch\generaDiagrammi.py
+////////////////////////////////////////////////////////////////////////////////
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import argparse
+
+# Uso: python generaDiagrammi.py [--csv nuggets.csv] [--label Pool] [--threshold 0.03]
+# Le figure descrivono il file passato con --csv: usare --label per distinguere
+# il pool completo dalla selezione Top-100 (i nomi dei file PNG includono l'etichetta).
+_p = argparse.ArgumentParser(description="Nugget dataset charts")
+_p.add_argument("--csv", default="nuggets.csv")
+_p.add_argument("--label", default="Pool")
+_p.add_argument("--threshold", type=float, default=0.03, help="Delta WDL threshold drawn in Chart 4")
+args = _p.parse_args()
+
+print(f"[*] Loading dataset: {args.csv} ...")
+df = pd.read_csv(args.csv)
+N = len(df)
+TAG = f"{args.label}, n={N}"
+
+# --- AUTO-FIX COLUMN NAMES ---
+# This ensures the script works even if columns are 'WIN_PROBABILITY' or 'Win_Probability'
+mapping = {
+    'WIN_PROBABILITY': 'Win_Probability',
+    'Win Probability': 'Win_Probability',
+    'Delta_Win_Probability': 'Delta_Win_Probability',
+    'Delta': 'Delta_Win_Probability'
+}
+df = df.rename(columns=mapping)
+
+# Set global academic style
+plt.style.use('ggplot')
+sns.set_theme(style="whitegrid", font_scale=1.1)
+
+# ---------------------------------------------------------
+# CHART 1: Game Phase Distribution (Pie Chart)
+# ---------------------------------------------------------
+plt.figure(figsize=(10, 8))
+logical_order = ["Opening", "Middlegame", "Transition to middlegame", "Transition to endgame", "Endgame"]
+# Check if categories exist in data
+available_phases = [p for p in logical_order if p in df['Fase'].unique()]
+fasi_counts = df['Fase'].value_counts().reindex(available_phases).dropna()
+
+def autopct_format(values):
+    def my_format(pct):
+        total = sum(values)
+        val = int(round(pct * total / 100.0))
+        return f'{pct:.1f}%\n({val})'
+    return my_format
+
+plt.pie(fasi_counts, labels=fasi_counts.index, autopct=autopct_format(fasi_counts), 
+        startangle=140, colors=sns.color_palette("viridis", len(fasi_counts)), 
+        explode=[0.05 if label == "Middlegame" else 0 for label in fasi_counts.index],
+        textprops={'fontsize': 12, 'fontweight': 'bold'})
+
+plt.title(f'Nugget Distribution by Game Phase ({TAG})', fontsize=16, fontweight='bold', pad=20)
+plt.tight_layout()
+plt.savefig(f'Fig1_Phase_Distribution_{args.label}.png', dpi=300)
+print(f"[OK] Saved: Fig1_Phase_Distribution_{args.label}.png")
+
+# ---------------------------------------------------------
+# CHART 2: Pawn Center Structures (Bar Chart)
+# ---------------------------------------------------------
+plt.figure(figsize=(12, 7))
+centri_counts = df['Centro'].value_counts()
+
+# Fixed palette warning by assigning hue
+ax = sns.barplot(x=centri_counts.index, y=centri_counts.values, hue=centri_counts.index, palette="magma", edgecolor='black', legend=False)
+
+plt.title(f'Pawn Center Structures ({TAG})', fontsize=16, fontweight='bold', pad=15)
+plt.xlabel('Center Type', fontsize=14)
+plt.ylabel('Number of Positions', fontsize=14)
+
+for p in ax.patches:
+    ax.annotate(f'{int(p.get_height())}', (p.get_x() + p.get_width() / 2., p.get_height()), 
+                ha='center', va='center', fontsize=12, fontweight='bold', xytext=(0, 10), 
+                textcoords='offset points')
+
+# --- INIZIO MODIFICA: Risoluzione etichette sovrapposte ---
+plt.xticks(rotation=45, ha='right', fontsize=12)
+# --- FINE MODIFICA ---
+
+plt.tight_layout()
+plt.savefig(f'Fig2_Center_Structures_{args.label}.png', dpi=300)
+print(f"[OK] Saved: Fig2_Center_Structures_{args.label}.png")
+
+# ---------------------------------------------------------
+# CHART 3: Indecision Map (Scatter Plot)
+# ---------------------------------------------------------
+plt.figure(figsize=(12, 8))
+
+sns.scatterplot(data=df, x='Win_Probability', y='Delta_Win_Probability', 
+                hue='Fase', style='Fase', s=100, palette='deep', alpha=0.8)
+
+plt.axvline(x=0.25, color='gray', linestyle='--', alpha=0.5, label='Black Target (0.25)')
+plt.axvline(x=0.75, color='gray', linestyle='--', alpha=0.5, label='White Target (0.75)')
+
+plt.title(f'Indecision Map: Win Probability vs MultiPV Delta ({TAG})', fontsize=16, fontweight='bold', pad=15)
+plt.xlabel('Win Probability, White point of view (W + D/2)', fontsize=14)
+plt.ylabel('Delta Win Probability (Line 1 vs Line 2)', fontsize=14)
+plt.legend(title='Game Phase', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+plt.tight_layout()
+plt.savefig(f'Fig3_Indecision_Scatter_{args.label}.png', dpi=300, bbox_inches='tight')
+print(f"[OK] Saved: Fig3_Indecision_Scatter_{args.label}.png")
+
+# ---------------------------------------------------------
+# CHART 4: Mathematical Tolerance (Delta WDL Histogram)
+# ---------------------------------------------------------
+plt.figure(figsize=(10, 6))
+
+sns.histplot(data=df, x='Delta_Win_Probability', bins=15, kde=True, color='indigo')
+
+plt.title(f'Delta WDL Distribution ({TAG})', fontsize=16, fontweight='bold', pad=15)
+plt.xlabel('Delta Win Probability', fontsize=14)
+plt.ylabel('Number of Positions (Nuggets)', fontsize=14)
+
+plt.axvline(x=args.threshold, color='red', linestyle=':', linewidth=2, label=f'Delta WDL = {args.threshold}')
+plt.legend()
+
+plt.tight_layout()
+plt.savefig(f'Fig4_Delta_Distribution_{args.label}.png', dpi=300)
+print(f"[OK] Saved: Fig4_Delta_Distribution_{args.label}.png")
+
+print("==================================================")
+print(" Nugget analysis visuals completed successfully! ")
+print("==================================================")
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: docs\outputLTCWch\genera_pgn.py
+////////////////////////////////////////////////////////////////////////////////
+
+"""
+Selezione delle Top-N pepite da nuggets.csv e scrittura di:
+  - nuggets_top100.pgn  (linea completa fino alla pepita, nessun troncamento)
+  - nuggets_top100.epd  (posizione finale: libro di aperture per i tornei)
+  - nuggets_top100.csv  (le righe scelte, per i diagrammi della selezione)
+
+Regola (dichiarata e riproducibile):
+  1. |Pwin - bersaglio| <= --pwin-tol  (bersaglio 0.75 oppure 0.25)
+  2. Delta WDL <= --delta-tol
+  3. se il CSV contiene le colonne W1/L1: L1 <= --opposite-max per le pepite a 0.75,
+     W1 <= --opposite-max per quelle a 0.25
+  4. ordinamento per Delta WDL crescente, poi per distanza di Pwin dal bersaglio
+  5. una sola pepita per linea di partita: si scarta una posizione se la sua linea
+     e' il prefisso (per mosse intere) di una gia' scelta, o viceversa
+
+Uso:  python genera_pgn.py [--csv nuggets.csv] [--n 100]
+"""
+import argparse
+import re
+import pandas as pd
+
+
+def get_args():
+    p = argparse.ArgumentParser(description="Selezione Top-N pepite")
+    p.add_argument("--csv", default="nuggets.csv")
+    p.add_argument("--n", type=int, default=100)
+    p.add_argument("--pwin-tol", type=float, default=0.03)
+    p.add_argument("--delta-tol", type=float, default=0.03)
+    p.add_argument("--opposite-max", type=float, default=0.0)
+    p.add_argument("--out", default="nuggets_top100")
+    return p.parse_args()
+
+
+def moves(variant: str) -> tuple:
+    """Lista di mosse senza numeri di mossa: confronto per mosse intere, non per caratteri."""
+    return tuple(t for t in re.sub(r"\d+\.", " ", str(variant)).split())
+
+
+def related(a: tuple, b: tuple) -> bool:
+    """True se una linea e' il prefisso dell'altra (stessa partita o stessa variante)."""
+    n = min(len(a), len(b))
+    return a[:n] == b[:n]
+
+
+def main():
+    args = get_args()
+    df = pd.read_csv(args.csv).drop_duplicates(subset=["FEN"]).copy()
+    df = df.rename(columns={"WIN_PROBABILITY": "Pwin", "Delta_Win_Probability": "Delta"})
+    for col in ("Pwin", "Delta"):
+        if col not in df.columns:
+            raise SystemExit(f"[ERRORE] Colonna mancante nel CSV: {col}")
+    print(f"[*] Pepite candidate nel CSV: {len(df)}")
+
+    df["Target"] = df["Pwin"].apply(lambda p: 0.75 if p >= 0.5 else 0.25)
+    df["Dist"] = (df["Pwin"] - df["Target"]).abs().round(3)
+
+    df = df[(df["Dist"] <= args.pwin_tol + 1e-9) & (df["Delta"] <= args.delta_tol + 1e-9)]
+    print(f"[*] Dopo le tolleranze (Pwin ±{args.pwin_tol}, Delta ≤ {args.delta_tol}): {len(df)}")
+
+    if {"W1", "L1"}.issubset(df.columns):
+        ok_high = (df["Target"] == 0.75) & (df["L1"] <= args.opposite_max + 1e-9)
+        ok_low = (df["Target"] == 0.25) & (df["W1"] <= args.opposite_max + 1e-9)
+        df = df[ok_high | ok_low]
+        print(f"[*] Dopo la condizione L=0 / W=0 (max {args.opposite_max}): {len(df)}")
+    else:
+        print("[!] Colonne W1/L1 assenti: condizione L=0 / W=0 NON verificata (CSV di vecchio formato).")
+
+    df = df.sort_values(by=["Delta", "Dist", "FEN"], kind="mergesort")
+
+    selection, chosen_lines = [], []
+    for _, row in df.iterrows():
+        line = moves(row["Variante_PGN"])
+        if any(related(line, c) for c in chosen_lines):
+            continue
+        selection.append(row)
+        chosen_lines.append(line)
+        if len(selection) >= args.n:
+            break
+
+    print(f"[*] Pepite selezionate (una per linea): {len(selection)}")
+    if len(selection) < args.n:
+        print(f"[!] Meno di {args.n} pepite soddisfano la regola: allargare le tolleranze o il database.")
+
+    with open(args.out + ".pgn", "w", encoding="utf-8") as fp, \
+         open(args.out + ".epd", "w", encoding="utf-8") as fe:
+        for i, row in enumerate(selection, 1):
+            date = str(row["Data_Recente"])
+            if date.startswith("1900") or date == "nan":
+                date = "????.??.??"          # data ignota: mai una data fittizia
+            fp.write('[Event "Nuggets Top-N"]\n[Site "NuggetsManagement"]\n')
+            fp.write(f'[Date "{date}"]\n[Round "{i}"]\n[White "?"]\n[Black "?"]\n[Result "*"]\n')
+            fp.write(f'[NuggetFEN "{row["FEN"]}"]\n')
+            fp.write(f'[Pwin "{row["Pwin"]:.3f}"]\n[DeltaWDL "{row["Delta"]:.3f}"]\n')
+            if {"W1", "D1", "L1"}.issubset(row.index):
+                fp.write(f'[WDL "{row["W1"]:.3f} {row["D1"]:.3f} {row["L1"]:.3f}"]\n')
+            fp.write(f'[Phase "{row["Fase"]}"]\n[Centre "{row["Centro"]}"]\n\n')
+            fp.write(f'{str(row["Variante_PGN"]).strip()} *\n\n')
+            epd = " ".join(str(row["FEN"]).split()[:4])
+            fe.write(f'{epd} id "nugget{i:03d}"; c0 "Pwin={row["Pwin"]:.3f} DeltaWDL={row["Delta"]:.3f}";\n')
+
+    # CSV della selezione: serve a generaDiagrammi.py --csv <out>.csv --label Top100
+    pd.DataFrame(selection).rename(
+        columns={"Pwin": "WIN_PROBABILITY", "Delta": "Delta_Win_Probability"}
+    ).drop(columns=["Target", "Dist"]).to_csv(args.out + ".csv", index=False)
+
+    print(f"[OK] Scritti {args.out}.pgn, {args.out}.epd e {args.out}.csv")
+
+
+if __name__ == "__main__":
+    main()
+
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: docs\outputLTCWch\tournament_visuals.py
+////////////////////////////////////////////////////////////////////////////////
+
+import chess.pgn
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import argparse
+
+def get_args():
+    parser = argparse.ArgumentParser(description="Round Robin Tournament Graphics Generator")
+    parser.add_argument("--pgn", type=str, default="RoundRobin_4engines.pgn", help="Tournament PGN file")
+    return parser.parse_args()
+
+def main():
+    args = get_args()
+    pgn_path = args.pgn
+
+    print(f"[*] Reading PGN file: {pgn_path} ...")
+
+    # List to collect data from each game
+    games_data = []
+
+    try:
+        with open(pgn_path, "r", encoding="utf-8", errors="ignore") as f:
+            while True:
+                headers = chess.pgn.read_headers(f)
+                if headers is None:
+                    break
+                
+                white = headers.get("White", "?")
+                black = headers.get("Black", "?")
+                result = headers.get("Result", "*")
+                ply_count = headers.get("PlyCount", "0")
+                
+                try:
+                    ply = int(ply_count)
+                except ValueError:
+                    ply = 0
+
+                if result == "1-0":
+                    w_res, b_res = "Win", "Loss"
+                    w_score, b_score = 1.0, 0.0
+                elif result == "0-1":
+                    w_res, b_res = "Loss", "Win"
+                    w_score, b_score = 0.0, 1.0
+                elif result == "1/2-1/2":
+                    w_res, b_res = "Draw", "Draw"
+                    w_score, b_score = 0.5, 0.5
+                else:
+                    continue
+
+                games_data.append({"Engine": white, "Opponent": black, "Color": "White", "Result": w_res, "Score": w_score, "Ply": ply})
+                games_data.append({"Engine": black, "Opponent": white, "Color": "Black", "Result": b_res, "Score": b_score, "Ply": ply})
+
+    except FileNotFoundError:
+        print(f"[ERROR] File '{pgn_path}' not found.")
+        return
+
+    df = pd.DataFrame(games_data)
+    if df.empty:
+        print("[!] No valid data extracted.")
+        return
+
+    print(f"[*] Processing {len(df)//2} valid games. Generating charts...")
+
+    # Academic style settings
+    plt.style.use('ggplot')
+    sns.set_theme(style="whitegrid", font_scale=1.1)
+
+    # =========================================================
+    # FIGURE 1: HEAD-TO-HEAD HEATMAP (H2H)
+    # =========================================================
+    plt.figure(figsize=(10, 8))
+    
+    h2h_matrix = df.pivot_table(index='Engine', columns='Opponent', values='Score', aggfunc='sum', fill_value=0)
+    
+    total_scores = h2h_matrix.sum(axis=1).sort_values(ascending=False)
+    h2h_matrix = h2h_matrix.loc[total_scores.index, total_scores.index]
+
+    sns.heatmap(h2h_matrix, annot=True, fmt=".1f", cmap="YlOrRd", linewidths=.5, cbar_kws={'label': 'Points Scored'})
+    plt.title("Head-to-Head Score Matrix", fontsize=16, fontweight='bold', pad=20)
+    plt.ylabel("Engine (Player)")
+    plt.xlabel("Opponent")
+    plt.tight_layout()
+    plt.savefig('Fig5_H2H_Heatmap.png', dpi=300)
+    print("[OK] Saved: Fig5_H2H_Heatmap.png")
+
+    # =========================================================
+    # FIGURE 2: W-D-L DISTRIBUTION (Stacked Bar Chart)
+    # =========================================================
+    plt.figure(figsize=(12, 7))
+
+    wdl_counts = df.groupby(['Engine', 'Result']).size().unstack(fill_value=0)
+    wdl_counts = wdl_counts.reindex(total_scores.index)
+    
+    colors = {"Win": "#2ca02c", "Draw": "#7f7f7f", "Loss": "#d62728"}
+    
+    ax = wdl_counts[['Win', 'Draw', 'Loss']].plot(kind='bar', stacked=True, color=[colors[c] for c in ['Win', 'Draw', 'Loss']], figsize=(12, 7), edgecolor='black')
+    
+    plt.title("Outcome Distribution (Win, Draw, Loss)", fontsize=16, fontweight='bold', pad=15)
+    plt.xlabel("")
+    plt.ylabel("Number of Games")
+    plt.xticks(rotation=0)
+    plt.legend(title="Outcome", bbox_to_anchor=(1.05, 1), loc='upper left')
+    
+    for c in ax.containers:
+        ax.bar_label(c, label_type='center', color='white', fontweight='bold', fontsize=10)
+
+    plt.tight_layout()
+    plt.savefig('Fig6_WDL_Distribution.png', dpi=300)
+    print("[OK] Saved: Fig6_WDL_Distribution.png")
+
+    # =========================================================
+    # FIGURE 3: ADVANTAGE CONVERSION (Global Outcome Pie)
+    # =========================================================
+    plt.figure(figsize=(9, 9))
+    
+    white_results = df[df['Color'] == 'White']['Result'].value_counts()
+    
+    labels_map = {"Win": "White Win", "Loss": "Black Win", "Draw": "Draw"}
+    white_results.index = white_results.index.map(labels_map)
+    
+    pie_colors = {"White Win": "#f1c40f", "Black Win": "#2c3e50", "Draw": "#95a5a6"}
+    
+    def autopct_format(pct):
+        return f'{pct:.1f}%'
+
+    plt.pie(white_results, labels=white_results.index, autopct=autopct_format, 
+            startangle=90, colors=[pie_colors.get(x, '#333') for x in white_results.index], 
+            textprops={'fontsize': 14, 'fontweight': 'bold'}, shadow=True,
+            explode=[0.05 if i==0 else 0 for i in range(len(white_results))])
+            
+    plt.title("Global Tournament Outcome\n(Conversion Rate vs Defense)", fontsize=16, fontweight='bold', pad=20)
+    plt.tight_layout()
+    plt.savefig('Fig7_Conversion_Pie.png', dpi=300)
+    print("[OK] Saved: Fig7_Conversion_Pie.png")
+
+    # =========================================================
+    # FIGURE 4: COMBAT DEPTH (PlyCount Boxplot)
+    # =========================================================
+    plt.figure(figsize=(12, 7))
+
+    sns.boxplot(data=df, x='Engine', y='Ply', palette="Set2", order=total_scores.index)
+    sns.stripplot(data=df, x='Engine', y='Ply', color=".25", alpha=0.3, size=3, order=total_scores.index)
+
+    plt.title("Tactical Resilience: Game Length Distribution (Ply)", fontsize=16, fontweight='bold', pad=15)
+    plt.xlabel("")
+    plt.ylabel("Game Duration (PlyCount)")
+    
+    mean_ply = df['Ply'].mean()
+    plt.axhline(mean_ply, color='red', linestyle='--', label=f'Global Average ({int(mean_ply)} ply)')
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig('Fig8_Game_Length_Boxplot.png', dpi=300)
+    print("[OK] Saved: Fig8_Game_Length_Boxplot.png")
+
+    print("==================================================")
+    print(" Tournament visuals generation completed! ")
+    print("==================================================")
+
+if __name__ == "__main__":
+    main()
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: src\engine_worker.py
+////////////////////////////////////////////////////////////////////////////////
+
+import asyncio
+import chess
+import chess.engine
+from state_manager import StateManager
+import qualimetria
+
+async def run_worker(worker_id: int, queue: asyncio.Queue, state: StateManager, config: dict):
+    """
+    Worker asincrono: gestisce un'istanza di Stockfish/ShashChess.
+    Preleva posizioni dalla coda, controlla la cache e, se necessario, analizza.
+    """
+    engine_path = config["engine_path"]
+    analysis_time = config["analysis_time"]
+    wdl_tolerance = config["wdl_tolerance"]
+    # Quota massima ammessa per il terzo esito: L per le pepite a 0.75, W per quelle a 0.25.
+    # 0.0 = definizione stretta (Pwin=75% con L=0, oppure Pwin=25% con W=0).
+    opposite_max = config.get("opposite_max", 0.0)
+    
+    # Calcolo dei target dinamici in base alla tolleranza specificata (es. 0.03 = 3%)
+    target_high_min = 0.75 - wdl_tolerance
+    target_high_max = 0.75 + wdl_tolerance
+    target_low_min = 0.25 - wdl_tolerance
+    target_low_max = 0.25 + wdl_tolerance
+
+    try:
+        # Avvia il processo del motore in background (comunicazione via pipe stdin/stdout)
+        transport, engine = await chess.engine.popen_uci(engine_path)
+        
+        # Configurazione opzioni UCI
+        engine_options = {
+            "Threads": config.get("threads", 1),
+            "Hash": config.get("hash", 64),
+            "UCI_ShowWDL": True
+        }
+        if config.get("syzygy_path"):
+            engine_options["SyzygyPath"] = config["syzygy_path"]
+            
+        await engine.configure(engine_options)
+        print(f"[WORKER {worker_id}] Motore UCI avviato e configurato.")
+        
+        while True:
+            # Preleva un task (o si sospende se la coda è vuota)
+            task = await queue.get()
+            
+            # Segnale di terminazione (veleno) per fermare il worker
+            if task is None:
+                queue.task_done()
+                break
+                
+            # Avvolgiamo tutta la logica di analisi in un blocco try-finally
+            # per garantire che task_done() venga chiamato una e una sola volta.
+            try:
+                board, current_date, variant_pgn = task
+                fen = board.fen()
+                
+                # 1. VERIFICA CACHE (Operazione O(1) in RAM, non blocca l'engine)
+                status = await state.register_fen(fen, current_date)
+                if status is not None:
+                    # HIT: La FEN era già nota. I contatori (frequenza/data) sono già stati aggiornati.
+                    continue
+                    
+                # 2. MISS: Posizione nuova. Eseguiamo l'Analisi in MultiPV=2
+                try:
+                    info = await engine.analyse(
+                        board, 
+                        chess.engine.Limit(time=analysis_time),
+                        multipv=2,
+                        options=engine_options
+                    )
+                    
+                    # Se il motore non trova almeno 2 mosse (es. c'è una sola mossa legale), scartiamo
+                    if len(info) < 2:
+                        await state.update_to_not_nugget(fen)
+                        continue
+                        
+                    # Controlliamo subito se la posizione termina con un matto forzato
+                    score = info[0]["score"].white()
+                    if score.is_mate():
+                        await state.update_to_not_nugget(fen)
+                        continue
+
+                    # Assicuriamoci che l'engine abbia fornito il dato WDL per entrambe le linee
+                    if "wdl" in info[0] and "wdl" in info[1]:
+                        # Terne (W, D, L) delle due linee, dal punto di vista del Bianco, come frazioni
+                        wdl_1 = info[0]["wdl"].white()
+                        wdl_2 = info[1]["wdl"].white()
+                        tot_1 = wdl_1.wins + wdl_1.draws + wdl_1.losses
+                        tot_2 = wdl_2.wins + wdl_2.draws + wdl_2.losses
+                        w1, d1, l1 = wdl_1.wins / tot_1, wdl_1.draws / tot_1, wdl_1.losses / tot_1
+                        w2, d2, l2 = wdl_2.wins / tot_2, wdl_2.draws / tot_2, wdl_2.losses / tot_2
+
+                        # Win probability = W + D/2
+                        win_prob_1 = wdl_1.expectation()
+                        win_prob_2 = wdl_2.expectation()
+
+                        # Calcolo del Delta Win Probability
+                        delta_win_prob = abs(win_prob_1 - win_prob_2)
+
+                        # Pepita "bianca": Pwin ~ 0.75 e L ~ 0 (quindi W = D).
+                        # Pepita "nera":   Pwin ~ 0.25 e W ~ 0 (quindi D = L).
+                        is_white_nugget = (target_high_min <= win_prob_1 <= target_high_max
+                                           and l1 <= opposite_max)
+                        is_black_nugget = (target_low_min <= win_prob_1 <= target_low_max
+                                           and w1 <= opposite_max)
+
+                        # Il Delta non deve superare la tolleranza!
+                        is_delta_valid = delta_win_prob <= wdl_tolerance
+
+                        if (is_white_nugget or is_black_nugget) and is_delta_valid:
+                            # 3. È UNA PEPITA! Estraiamo le altre metriche per il salvataggio
+                            fase = qualimetria.get_game_phase(board)
+                            centro = qualimetria.analyze_center_type(board)
+                            tensione = qualimetria.get_tension(board)
+                            imbalance = qualimetria.get_material_imbalance(board)
+                            
+                            metrics = {
+                                "win_probability": round(win_prob_1, 3),
+                                "delta_win_probability": round(delta_win_prob, 3),
+                                "wdl_1": (round(w1, 3), round(d1, 3), round(l1, 3)),
+                                "wdl_2": (round(w2, 3), round(d2, 3), round(l2, 3)),
+                                "fase": fase,
+                                "centro": centro,
+                                "tensione": tensione,
+                                "material_imbalance": imbalance
+                            }
+                            
+                            # 3.3 Salvataggio Globale
+                            await state.update_to_nugget(fen, metrics, variant_pgn)
+                            print(f"[WORKER {worker_id}] ✨ PEPITA TROVATA! WDL1: {win_prob_1:.3f} | Delta WDL: {delta_win_prob:.3f}")
+                        else:
+                            # Scartata dai filtri WDL
+                            await state.update_to_not_nugget(fen)
+                    else:
+                        # Niente output WDL (caso anomalo)
+                        await state.update_to_not_nugget(fen)
+
+                except chess.engine.EngineTerminatedError:
+                    print(f"[WORKER {worker_id}] ⚠️ Crash del motore (EngineTerminatedError).")
+                    await state.update_to_not_nugget(fen)
+                    
+                except Exception as e:
+                    print(f"[WORKER {worker_id}] ⚠️ Errore generico durante l'analisi: {e}")
+                    await state.update_to_not_nugget(fen)
+                    
+            finally:
+                # Segnala alla coda che questo specifico task è concluso.
+                # Chiamato esattamente una volta per ogni elemento scaricato dalla coda.
+                queue.task_done()
+                
+    finally:
+        # Quando il while loop si rompe (segnale None), chiudiamo il motore pulitamente
+        await engine.quit()
+        print(f"[WORKER {worker_id}] Spegnimento completato.")
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: src\exporter.py
+////////////////////////////////////////////////////////////////////////////////
+
+import json
+import csv
+from typing import List
+from collections import Counter
+from state_manager import NuggetRecord
+
+def _record_to_dict(record: NuggetRecord) -> dict:
+    """Helper per serializzare correttamente gli Enum e i tipi complessi."""
+    return {
+        "fen": record.fen,
+        "status": record.status.value,
+        "frequency": record.frequency,
+        "last_seen_date": record.last_seen_date,
+        "win_probability": record.win_probability,
+        "delta_win_probability": record.delta_win_probability,
+        "wdl_1": list(record.wdl_1) if record.wdl_1 else None,
+        "wdl_2": list(record.wdl_2) if record.wdl_2 else None,
+        "fase": record.fase.value if record.fase else None,
+        "centro": record.centro,
+        "tensione": record.tensione,
+        "material_imbalance": record.material_imbalance,
+        "variant_pgn": record.variant_pgn
+    }
+
+def export_jsonl(nuggets: List[NuggetRecord], filepath: str):
+    """Esporta i dati in formato JSON Lines (un oggetto JSON per riga)."""
+    print(f"[*] Esportazione JSONL in corso: {filepath}...")
+    with open(filepath, 'w', encoding='utf-8') as f:
+        for n in nuggets:
+            f.write(json.dumps(_record_to_dict(n)) + "\n")
+
+def export_csv(nuggets: List[NuggetRecord], filepath: str):
+    """Esporta i dati in formato CSV tabellare."""
+    print(f"[*] Esportazione CSV in corso: {filepath}...")
+    
+    # Header pulito: rimosso Delta_CP
+    headers = [
+        "FEN", "WIN_PROBABILITY", "Delta_Win_Probability", "Fase", 
+        "Centro", "Tensione", "Imbalance", "Frequenza", "Data_Recente", "Variante_PGN",
+        "W1", "D1", "L1", "W2", "D2", "L2"
+    ]
+    
+    with open(filepath, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(headers)
+        for n in nuggets:
+            writer.writerow([
+                n.fen,
+                f"{n.win_probability:.3f}" if n.win_probability is not None else "",
+                f"{n.delta_win_probability:.3f}" if n.delta_win_probability is not None else "",
+                n.fase.value if n.fase else "",
+                n.centro,
+                n.tensione,
+                f"{n.material_imbalance:.1f}" if n.material_imbalance is not None else "",
+                n.frequency,
+                n.last_seen_date,
+                n.variant_pgn,
+                *([f"{x:.3f}" for x in n.wdl_1] if n.wdl_1 else ["", "", ""]),
+                *([f"{x:.3f}" for x in n.wdl_2] if n.wdl_2 else ["", "", ""])
+            ])
+
+def export_html_summary(nuggets: List[NuggetRecord], filepath: str):
+    """Genera una dashboard HTML statica con le statistiche delle pepite."""
+    print(f"[*] Generazione Dashboard HTML in corso: {filepath}...")
+    
+    if not nuggets:
+        print("[!] Nessuna pepita trovata per generare il report HTML.")
+        return
+
+    # Calcolo Statistiche
+    total_nuggets = len(nuggets)
+    fasi_counter = Counter(n.fase.value for n in nuggets if n.fase)
+    centri_counter = Counter(n.centro for n in nuggets if n.centro)
+    
+    # Ordiniamo le pepite per frequenza per trovare le "Top 10"
+    top_frequent = sorted(nuggets, key=lambda x: x.frequency, reverse=True)[:10]
+
+    # Generazione stringhe per le tabelle HTML
+    fasi_html = "".join(f"<li><strong>{f}:</strong> {c} pepite</li>" for f, c in fasi_counter.most_common())
+    centri_html = "".join(f"<li><strong>{c}:</strong> {count} pepite</li>" for c, count in centri_counter.most_common())
+    
+    top_html = ""
+    for n in top_frequent:
+        wp_str = f"{n.win_probability:.3f}" if n.win_probability is not None else "N/A"
+        dwp_str = f"{n.delta_win_probability:.3f}" if n.delta_win_probability is not None else "N/A"
+        
+        top_html += f"""
+        <tr>
+            <td style='font-family: monospace; font-size: 0.9em;'>{n.fen}</td>
+            <td>{n.frequency}</td>
+            <td>{wp_str}</td>
+            <td>{dwp_str}</td>
+            <td>{n.last_seen_date}</td>
+        </tr>
+        """
+
+    # Template HTML con CSS inline
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="it">
+    <head>
+        <meta charset="UTF-8">
+        <title>Report Qualimetria Pepite - NuggetsManagement</title>
+        <style>
+            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }}
+            .container {{ max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }}
+            h1, h2 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
+            .stats-grid {{ display: flex; gap: 20px; margin-bottom: 30px; }}
+            .stat-box {{ flex: 1; background: #ecf0f1; padding: 20px; border-radius: 8px; border-left: 5px solid #3498db; }}
+            ul {{ list-style-type: none; padding: 0; }}
+            li {{ padding: 8px 0; border-bottom: 1px solid #ddd; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
+            th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
+            th {{ background-color: #3498db; color: white; }}
+            tr:hover {{ background-color: #f5f5f5; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>♟️ Report Analisi Pepite (NuggetsManagement)</h1>
+            <p>Sintesi automatica delle posizioni estratte per elevata tensione della Win Probability.</p>
+            
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <h3>Totale Pepite Estratte</h3>
+                    <p style="font-size: 2em; font-weight: bold; margin: 0; color: #e74c3c;">{total_nuggets}</p>
+                </div>
+                <div class="stat-box">
+                    <h3>Distribuzione per Fase</h3>
+                    <ul>{fasi_html}</ul>
+                </div>
+                <div class="stat-box">
+                    <h3>Tipi di Centro</h3>
+                    <ul>{centri_html}</ul>
+                </div>
+            </div>
+
+            <h2>🔥 Top 10 Pepite più "Insospettabili" (Alta Frequenza)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>FEN</th>
+                        <th>Frequenza (Occorrenze)</th>
+                        <th>Win Probability</th>
+                        <th>Delta Win Prob.</th>
+                        <th>Ultima Apparizione</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {top_html}
+                </tbody>
+            </table>
+        </div>
+    </body>
+    </html>
+    """
+
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    print("[*] Dashboard HTML generata con successo!")
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: src\main.py
+////////////////////////////////////////////////////////////////////////////////
+
+import asyncio
+import json
+import os
+import sys
+import time
+from state_manager import StateManager
+from pgn_producer import produce_tasks
+from engine_worker import run_worker
+import exporter
+
+def load_config(config_path="config.json") -> dict:
+    """Carica il file di configurazione JSON."""
+    if not os.path.exists(config_path):
+        print(f"[ERRORE] File di configurazione '{config_path}' non trovato.")
+        sys.exit(1)
+    with open(config_path, "r") as f:
+        return json.load(f)
+
+async def main():
+    print("==================================================")
+    print("   NuggetsManagement - Miner di Pepite WDL        ")
+    print("==================================================")
+    
+    # 1. Caricamento configurazioni e setup cartelle
+    config = load_config()
+    os.makedirs(config["output_dir"], exist_ok=True)
+    
+    # 2. Inizializzazione Stato e Coda
+    state = StateManager()
+    # Una coda di 1000 elementi è perfetta. Evita che il Producer legga 
+    # milioni di posizioni riempiendo la RAM prima che i Worker le analizzino.
+    queue = asyncio.Queue(maxsize=1000) 
+    
+    concurrency = config.get("concurrency", 4)
+    print(f"[*] Concorrenza: {concurrency} motori paralleli.")
+    print(f"[*] Tempo per analisi: {config['analysis_time']} sec.")
+    
+    start_time = time.time()
+    
+    # 3. Avvio dei Worker (Consumatori)
+    workers = []
+    for i in range(concurrency):
+        task = asyncio.create_task(run_worker(i, queue, state, config))
+        workers.append(task)
+        
+    # 4. Avvio del Producer
+    try:
+        # Aspettiamo che il producer finisca di leggere tutto il file PGN
+        await produce_tasks(config["pgn_path"], queue)
+        
+        print("[*] Producer terminato. Attesa svuotamento della coda...")
+        # Aspettiamo che i worker processino tutto quello che è rimasto in coda
+        await queue.join()
+        
+    except KeyboardInterrupt:
+        print("\n[!] Interruzione manuale (CTRL+C) rilevata. Spegnimento grazioso in corso...")
+    
+    finally:
+        # 5. Spegnimento Grazioso dei Worker (Poison Pill)
+        print("[*] Invio segnale di spegnimento ai motori...")
+        for _ in range(concurrency):
+            await queue.put(None)
+            
+        await asyncio.gather(*workers)
+        
+        # 6. Esportazione Finale
+        print("\n==================================================")
+        print("   Analisi Completata. Generazione Output...      ")
+        print("==================================================")
+        
+        all_nuggets = state.get_all_nuggets()
+        
+        jsonl_path = os.path.join(config["output_dir"], "nuggets.jsonl")
+        csv_path = os.path.join(config["output_dir"], "nuggets.csv")
+        html_path = os.path.join(config["output_dir"], "dashboard.html")
+        
+        exporter.export_jsonl(all_nuggets, jsonl_path)
+        exporter.export_csv(all_nuggets, csv_path)
+        exporter.export_html_summary(all_nuggets, html_path)
+        
+        elapsed = time.time() - start_time
+        print(f"\n[FINE] Trovate {len(all_nuggets)} pepite uniche.")
+        print(f"[FINE] Tempo totale: {elapsed:.2f} secondi.")
+
+if __name__ == "__main__":
+    # Su Windows, per evitare errori con asyncio e subprocessi
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass # Già gestito internamente
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: src\pgn_producer.py
+////////////////////////////////////////////////////////////////////////////////
+
+import asyncio
+import chess
+import chess.pgn
+
+def build_variant_string(san_moves: list) -> str:
+    """
+    Costruisce una stringa PGN leggibile (es. '1. e4 e5 2. Nf3') a partire
+    da una lista di mosse in notazione algebrica standard (SAN).
+    È molto più veloce che ricostruire l'intero albero PGN per ogni mossa.
+    """
+    result = []
+    for i, move in enumerate(san_moves):
+        if i % 2 == 0:
+            result.append(f"{(i // 2) + 1}. {move}")
+        else:
+            result.append(move)
+    return " ".join(result)
+
+async def produce_tasks(pgn_path: str, queue: asyncio.Queue):
+    """
+    Legge il file PGN in streaming. Estrae le posizioni, la data e la variante,
+    e le inserisce nella coda per i worker.
+    """
+    print(f"[PRODUCER] Inizio lettura del file: {pgn_path}")
+    
+    # Usiamo errors='ignore' perché i vecchi DB PGN hanno spesso caratteri invalidi negli header
+    with open(pgn_path, "r", encoding="utf-8", errors="ignore") as pgn_file:
+        games_processed = 0
+        
+        while True:
+            # Legge una singola partita dal file
+            game = chess.pgn.read_game(pgn_file)
+            if game is None:
+                break  # Fine del file raggiunta
+            
+            games_processed += 1
+            
+            # Estrae la data. Formato standard PGN: YYYY.MM.DD
+            game_date = game.headers.get("Date", "1900.01.01")
+            if "?" in game_date:  # Gestisce date sconosciute (es. "????.??.??")
+                game_date = "1900.01.01"
+            
+            board = game.board()
+            san_moves = []
+            
+            # Scorre tutte le mosse della linea principale
+            for move in game.mainline_moves():
+                # Salviamo la notazione SAN prima di muovere per costruire la variante
+                san_moves.append(board.san(move))
+                board.push(move)
+                
+                board_copy = board.copy()
+                variant_str = build_variant_string(san_moves)
+                
+                # Crea il pacchetto dati
+                task_payload = (board_copy, game_date, variant_str)
+                
+                # .put() è bloccante (in modo asincrono). Se la coda ha raggiunto la sua maxsize,
+                # il producer si ferma qui e attende che i worker la svuotino, salvando la RAM.
+                await queue.put(task_payload)
+            
+            # Cede brevemente il controllo all'event loop per non "soffocare" i worker
+            # durante il parsing massivo
+            await asyncio.sleep(0)
+            
+            # Un piccolo feedback visivo ogni 1000 partite lette
+            if games_processed % 1000 == 0:
+                print(f"[PRODUCER] Lette {games_processed} partite dal PGN...")
+
+    print(f"[PRODUCER] Lettura completata! Totale partite: {games_processed}")
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: src\qualimetria.py
+////////////////////////////////////////////////////////////////////////////////
+
+import chess
+from enum import Enum
+
+class GamePhase(Enum):
+    APERTURA = "Opening"
+    MEDIOGIOCO = "Middlegame"
+    TRANSIZIONE_MEDIOGIOCO = "Transition to middlegame"
+    TRANSIZIONE_FINALE = "Transition to endgame"
+    FINALE = "Endgame"
+
+# Pesi specifici dell'algoritmo di Smirnov dal C++
+SMIRNOV_WEIGHTS = {
+    chess.KING: 3.0,
+    chess.QUEEN: 9.9,
+    chess.ROOK: 5.5,
+    chess.BISHOP: 3.5,
+    chess.KNIGHT: 3.1,
+    chess.PAWN: 1.0
+}
+
+# Valori classici usati SOLO per l'asimmetria materiale a fine script
+STANDARD_PIECE_VALUES = {
+    chess.KING: 0.0,
+    chess.QUEEN: 9.0,
+    chess.ROOK: 5.0,
+    chess.BISHOP: 3.0,
+    chess.KNIGHT: 3.0,
+    chess.PAWN: 1.0
+}
+
+def get_game_phase(board: chess.Board) -> GamePhase:
+    """
+    Determina la fase della partita traducendo ESATTAMENTE 
+    l'algoritmo C++ originale di Smirnov.
+    """
+    num_tot_unit = len(board.piece_map())
+
+    tot_mat_fase = 0.0
+    for piece in board.piece_map().values():
+        tot_mat_fase += SMIRNOV_WEIGHTS.get(piece.piece_type, 0.0)
+
+    num_semi_move_int = board.ply()
+
+    fase_num = -1.0
+    if num_semi_move_int != 0:
+        fase_num = (num_tot_unit * tot_mat_fase) / (3.0 * (num_semi_move_int + 0.001))
+
+    if 0 <= fase_num < 5:
+        return GamePhase.FINALE
+    elif 5 <= fase_num < 10:
+        return GamePhase.TRANSIZIONE_FINALE
+    elif 10 <= fase_num < 40:
+        return GamePhase.MEDIOGIOCO
+    elif 40 <= fase_num < 50:
+        return GamePhase.TRANSIZIONE_MEDIOGIOCO
+    elif fase_num >= 50 or fase_num == -1.0:
+        return GamePhase.APERTURA
+        
+    return GamePhase.APERTURA
+
+def analyze_center_type(board: chess.Board) -> str:
+    """
+    Analizza il tipo di centro traducendo ESATTAMENTE la logica assoluta
+    del nuovo pawns_element.cpp a python-chess.
+    """
+    w_pawns = int(board.pieces(chess.PAWN, chess.WHITE))
+    b_pawns = int(board.pieces(chess.PAWN, chess.BLACK))
+    
+    def sq_bb(square: int) -> int:
+        return 1 << square
+
+    # Variabili booleane per case specifiche (come nel C++)
+    w_d4 = bool(w_pawns & sq_bb(chess.D4))
+    w_e4 = bool(w_pawns & sq_bb(chess.E4))
+    w_d5 = bool(w_pawns & sq_bb(chess.D5))
+    w_e5 = bool(w_pawns & sq_bb(chess.E5))
+    w_d3 = bool(w_pawns & sq_bb(chess.D3))
+    w_e3 = bool(w_pawns & sq_bb(chess.E3))
+    w_c3 = bool(w_pawns & sq_bb(chess.C3))
+    w_f3 = bool(w_pawns & sq_bb(chess.F3))
+
+    b_d4 = bool(b_pawns & sq_bb(chess.D4))
+    b_e4 = bool(b_pawns & sq_bb(chess.E4))
+    b_d5 = bool(b_pawns & sq_bb(chess.D5))
+    b_e5 = bool(b_pawns & sq_bb(chess.E5))
+    b_d6 = bool(b_pawns & sq_bb(chess.D6))
+    b_e6 = bool(b_pawns & sq_bb(chess.E6))
+    b_c6 = bool(b_pawns & sq_bb(chess.C6))
+    b_f6 = bool(b_pawns & sq_bb(chess.F6))
+
+    # Maschere Bitboard di base
+    FileDBB = chess.BB_FILES[3]
+    FileEBB = chess.BB_FILES[4]
+    FileCBB = chess.BB_FILES[2]
+    Rank3BB = chess.BB_RANKS[2]
+    Rank4BB = chess.BB_RANKS[3]
+    Rank5BB = chess.BB_RANKS[4]
+    Rank6BB = chess.BB_RANKS[5]
+
+    # Conta i pedoni centrali per colore
+    white_center_count = sum([w_d4, w_e4, w_d5, w_e5])
+    black_center_count = sum([b_d4, b_e4, b_d5, b_e5])
+
+    # 1. Centro APERTO: nessun pedone sulle 4 case centrali
+    if white_center_count == 0 and black_center_count == 0:
+        return "Open Center"
+
+    # Funzione helper per calcolare gli attacchi dei pedoni
+    def pawn_attacks_bb(pawns: int, color: chess.Color) -> int:
+        attacks = 0
+        if color == chess.WHITE:
+            attacks |= (pawns << 7) & ~chess.BB_FILE_H
+            attacks |= (pawns << 9) & ~chess.BB_FILE_A
+        else:
+            attacks |= (pawns >> 7) & ~chess.BB_FILE_A
+            attacks |= (pawns >> 9) & ~chess.BB_FILE_H
+        return attacks & 0xFFFFFFFFFFFFFFFF
+
+    # 2. Centro CHIUSO: catene di pedoni bloccate al centro SENZA tensione
+    w_center_pawns = w_pawns & (FileDBB | FileEBB)
+    b_center_pawns = b_pawns & (FileDBB | FileEBB)
+
+    w_center_attacks = pawn_attacks_bb(w_center_pawns, chess.WHITE)
+    b_center_attacks = pawn_attacks_bb(b_center_pawns, chess.BLACK)
+
+    # C'è tensione se i pedoni centrali possono catturarsi a vicenda
+    central_tension = bool((w_center_attacks & b_center_pawns) or (b_center_attacks & w_center_pawns))
+    closed_center = False
+
+    # Se c'è tensione, NON è un centro chiuso.
+    if not central_tension:
+        # Verifichiamo la presenza di almeno un blocco frontale
+        if (w_d4 and b_d5) or (w_e4 and b_e5) or (w_d5 and b_d6) or (w_e5 and b_e6):
+            # Un vero centro chiuso richiede pedoni su entrambe le colonne centrali per entrambi i colori
+            if (w_center_pawns & FileDBB) and (w_center_pawns & FileEBB) and \
+               (b_center_pawns & FileDBB) and (b_center_pawns & FileEBB):
+                closed_center = True
+
+    if closed_center:
+        # Struttura Francese: Bianco: d4, e5 vs Nero: d5, e6
+        if (w_d4 and w_e5 and b_d5 and b_e6) or (b_d4 and b_e5 and w_d5 and w_e3):
+            return "Closed Center (French Chain)"
+        # Struttura Est-Indiana: Bianco: e4, d5 vs Nero: e5, d6
+        if (w_e4 and w_d5 and b_e5 and b_d6) or (b_e4 and b_d5 and w_e5 and w_d3):
+            return "Closed Center (King's Indian Chain)"
+        return "Closed Center"
+
+    # 3. Centro STATICO: pedoni centrali fissi su colonne opposte
+    if (w_d4 and b_d5) and not (w_e4 or b_e4 or w_e5 or b_e5):
+        no_immediate_tension = True
+        if (w_pawns & (Rank3BB | Rank4BB)) or (b_pawns & (Rank6BB | Rank5BB)):
+            no_immediate_tension = False
+        if no_immediate_tension:
+            return "Static Center (d4-d5)"
+
+    if (w_e4 and b_e5) and not (w_d4 or b_d4 or w_d5 or b_d5):
+        no_immediate_tension = True
+        if (w_pawns & (Rank3BB | Rank4BB)) or (b_pawns & (Rank6BB | Rank5BB)):
+            no_immediate_tension = False
+        if no_immediate_tension:
+            return "Static Center (e4-e5)"
+
+    # 4. Centro MOBILE: un pedone centrale sostenuto da un altro
+    if (w_d4 and (w_e3 or w_c3)) or (w_e4 and (w_d3 or w_f3)):
+        return "Mobile Center"
+    if (b_d5 and (b_e6 or b_c6)) or (b_e5 and (b_d6 or b_f6)):
+        return "Mobile Center"
+
+    # 5. Centro DINAMICO: presenza di IQP o Pedoni Sospesi
+
+    # --- VERIFICA IQP (Pedone di Donna Isolato) ---
+    # 1. Il pedone amico deve essere in d4 (Bianco) o d5 (Nero).
+    # 2. Deve essere l'UNICO pedone amico sulla colonna D.
+    # 3. NON ci devono essere pedoni amici sulle colonne C ed E.
+    # 4. NON ci devono essere pedoni avversari sulla colonna D.
+    
+    w_has_iqp = w_d4 and \
+                (bin(w_pawns & FileDBB).count('1') == 1) and \
+                not (w_pawns & (FileCBB | FileEBB)) and \
+                not (b_pawns & FileDBB)
+
+    b_has_iqp = b_d5 and \
+                (bin(b_pawns & FileDBB).count('1') == 1) and \
+                not (b_pawns & (FileCBB | FileEBB)) and \
+                not (w_pawns & FileDBB)
+
+    if w_has_iqp or b_has_iqp:
+        return "Dynamic Center (Isolated Queen's Pawn)"
+
+    # --- VERIFICA PEDONI SOSPESI (HANGING PAWNS) ---
+    def find_hanging_pawns(color_pawns: int, color: chess.Color) -> bool:
+        """
+        Fedele alla find_hanging_pawns definita a riga 168 del C++.
+        """
+        for s in chess.SQUARES:
+            if not (color_pawns & sq_bb(s)):
+                continue
+                
+            f = chess.square_file(s)
+            r = chess.square_rank(s)
+            
+            # 1. Devono essere pedoni CENTRALi o semi-centrali (colonne c, d, e).
+            if 2 <= f <= 4:
+                # 2. Devono essere avanzati (non sulle traverse di partenza)
+                is_advanced = (r >= 2) if color == chess.WHITE else (r <= 5)
+                
+                # 3. Controlliamo che ci sia il compagno esattamente a destra
+                if is_advanced and (color_pawns & sq_bb(s + 1)):
+                    left_outer = f - 1
+                    right_outer = f + 2
+                    
+                    has_left_outer = bool(color_pawns & chess.BB_FILES[left_outer]) if left_outer >= 0 else False
+                    has_right_outer = bool(color_pawns & chess.BB_FILES[right_outer]) if right_outer <= 7 else False
+                    
+                    # Se non ci sono alleati sulle colonne esterne, sono veri "Hanging Pawns" centrali
+                    if not has_left_outer and not has_right_outer:
+                        return True
+        return False
+
+    if find_hanging_pawns(w_pawns, chess.WHITE) or find_hanging_pawns(b_pawns, chess.BLACK):
+        return "Dynamic Center (Hanging Pawns)"
+
+    # Se nessuno dei casi sopra, restituisce "Dynamic Center" generico
+    return "Dynamic Center"
+
+def get_tension(board: chess.Board) -> int:
+    """Restituisce il numero di catture legali istantaneamente possibili."""
+    return len(list(board.generate_legal_captures()))
+
+def get_material_imbalance(board: chess.Board) -> float:
+    """Calcola l'asimmetria del materiale."""
+    w_mat = sum(STANDARD_PIECE_VALUES[p.piece_type] for p in board.piece_map().values() if p.color == chess.WHITE)
+    b_mat = sum(STANDARD_PIECE_VALUES[p.piece_type] for p in board.piece_map().values() if p.color == chess.BLACK)
+    return round(abs(w_mat - b_mat), 2)
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: src\state_manager.py
+////////////////////////////////////////////////////////////////////////////////
+
+import asyncio
+from enum import Enum
+from dataclasses import dataclass
+from typing import Optional, Dict, List
+from qualimetria import GamePhase
+
+class NuggetStatus(Enum):
+    PENDING = "Pending"               # In elaborazione
+    NOT_NUGGET = "Not Nugget"         # Non rientra nei target WDL
+    NUGGET = "Nugget"                 # È una pepita!
+
+@dataclass
+class NuggetRecord:
+    """Modello dati per tracciare una posizione (FEN) e le sue metriche."""
+    fen: str
+    status: NuggetStatus
+    frequency: int = 1
+    last_seen_date: str = "1900-01-01"
+    
+    # Metriche (Popolate solo se status == NUGGET)
+    win_probability: Optional[float] = None
+    delta_win_probability: Optional[float] = None
+    wdl_1: Optional[tuple] = None   # (W, D, L) della linea migliore, punto di vista del Bianco
+    wdl_2: Optional[tuple] = None   # (W, D, L) della seconda linea
+    fase: Optional[GamePhase] = None
+    centro: Optional[str] = None
+    tensione: Optional[int] = None
+    material_imbalance: Optional[float] = None
+    variant_pgn: Optional[str] = None
+
+class StateManager:
+    """Gestore thread-safe della cache delle posizioni."""
+    
+    def __init__(self):
+        # Mappa la stringa FEN al suo record storico
+        self._cache: Dict[str, NuggetRecord] = {}
+        # Lock asincrono per prevenire race conditions tra i worker
+        self._lock = asyncio.Lock()
+
+    async def register_fen(self, fen: str, current_date: str) -> Optional[NuggetStatus]:
+        """
+        Controlla se la FEN è nota.
+        Se esiste: aggiorna data/frequenza e restituisce lo status (salta l'analisi).
+        Se non esiste: crea un record PENDING e restituisce None (procede all'analisi).
+        """
+        async with self._lock:
+            if fen in self._cache:
+                record = self._cache[fen]
+                record.frequency += 1
+                # Aggiorna alla data più recente (confronto stringhe standard YYYY.MM.DD)
+                if current_date > record.last_seen_date:
+                    record.last_seen_date = current_date
+                return record.status
+            else:
+                self._cache[fen] = NuggetRecord(
+                    fen=fen, 
+                    status=NuggetStatus.PENDING, 
+                    last_seen_date=current_date
+                )
+                return None
+
+    async def update_to_not_nugget(self, fen: str):
+        """Marca una FEN in elaborazione come scartata dal filtro WDL."""
+        async with self._lock:
+            if fen in self._cache:
+                self._cache[fen].status = NuggetStatus.NOT_NUGGET
+
+    async def update_to_nugget(self, fen: str, metrics: dict, variant_pgn: str):
+        """Salva tutte le metriche per una pepita validata."""
+        async with self._lock:
+            if fen in self._cache:
+                record = self._cache[fen]
+                record.status = NuggetStatus.NUGGET
+                record.variant_pgn = variant_pgn
+                
+                # Popola le nuove metriche fornite dal dizionario (senza delta_cp)
+                record.win_probability = metrics.get('win_probability')
+                record.delta_win_probability = metrics.get('delta_win_probability')
+                record.wdl_1 = metrics.get('wdl_1')
+                record.wdl_2 = metrics.get('wdl_2')
+                record.fase = metrics.get('fase')
+                record.centro = metrics.get('centro')
+                record.tensione = metrics.get('tensione')
+                record.material_imbalance = metrics.get('material_imbalance')
+
+    def get_all_nuggets(self) -> List[NuggetRecord]:
+        """Restituisce solo le pepite validate (usato alla fine per l'export)."""
+        return [record for record in self._cache.values() if record.status == NuggetStatus.NUGGET]
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: src\outputLTCWch\generaDiagrammi.py
+////////////////////////////////////////////////////////////////////////////////
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Imposta uno stile elegante da pubblicazione accademica
+sns.set_theme(style="whitegrid", context="paper", font_scale=1.2)
+
+# Carica il dataset
+print("Caricamento dataset...")
+df = pd.read_csv('nuggets.csv')
+
+# ---------------------------------------------------------
+# GRAFICO 1: Distribuzione per Fase di Gioco
+# ---------------------------------------------------------
+plt.figure(figsize=(10, 6))
+# Ordine cronologico della partita per avere senso logico sull'asse X
+fasi_order = ['Apertura', 'Mediogioco', 'Transizione Mediogioco', 'Transizione Finale', 'Finale']
+
+ax1 = sns.countplot(data=df, x='Fase', order=fasi_order, palette="viridis")
+plt.title('Distribuzione dei Picchi di Tensione (WDL 75/25) per Fase di Gioco', fontsize=14, pad=15, fontweight='bold')
+plt.ylabel('Numero di Pepite Estratte', fontsize=12)
+plt.xlabel('Fase della Partita', fontsize=12)
+
+# Aggiunge i numerini esatti sopra ogni colonna
+for p in ax1.patches:
+    ax1.annotate(f'{int(p.get_height())}', (p.get_x() + p.get_width() / 2., p.get_height()), 
+                 ha='center', va='bottom', fontsize=11, color='black', xytext=(0, 5), textcoords='offset points')
+
+plt.tight_layout()
+plt.savefig('Fig1_Distribuzione_Fasi.png', dpi=300, bbox_inches='tight')
+print("[OK] Salvato: Fig1_Distribuzione_Fasi.png")
+
+# ---------------------------------------------------------
+# GRAFICO 2: Distribuzione per Tipologia di Centro
+# ---------------------------------------------------------
+plt.figure(figsize=(12, 8))
+# Ordina dal più frequente al meno frequente
+centro_order = df['Centro'].value_counts().index
+
+ax2 = sns.countplot(data=df, y='Centro', order=centro_order, palette="mako")
+plt.title('Frequenza dei Picchi di Tensione per Struttura del Centro', fontsize=14, pad=15, fontweight='bold')
+plt.xlabel('Numero di Pepite Estratte', fontsize=12)
+plt.ylabel('Tipologia di Centro (Bitboard Classification)', fontsize=12)
+
+# Aggiunge i numerini a destra di ogni barra
+for p in ax2.patches:
+    ax2.annotate(f'{int(p.get_width())}', (p.get_width(), p.get_y() + p.get_height() / 2.), 
+                 ha='left', va='center', fontsize=11, color='black', xytext=(5, 0), textcoords='offset points')
+
+plt.tight_layout()
+plt.savefig('Fig2_Distribuzione_Centri.png', dpi=300, bbox_inches='tight')
+print("[OK] Salvato: Fig2_Distribuzione_Centri.png")
+print("Elaborazione grafici completata!")
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: src\outputLTCWch\genera_pgn.py
+////////////////////////////////////////////////////////////////////////////////
+
+import pandas as pd
+
+print("Caricamento dataset...")
+df = pd.read_csv('nuggets.csv')
+
+# Rimuovi eventuali duplicati esatti di FEN
+df = df.drop_duplicates(subset=['FEN']).copy()
+
+# --- NUOVO FILTRO GLOBALE: Mantiene solo le pepite più profonde (nodi foglia) ---
+print("Filtraggio dell'albero delle varianti per mantenere solo le linee più profonde...")
+df['Variante_PGN'] = df['Variante_PGN'].astype(str).str.strip()
+df['pgn_len'] = df['Variante_PGN'].str.len()
+
+# Ordiniamo per lunghezza decrescente: le varianti con più mosse vengono prima
+df_sorted = df.sort_values(by='pgn_len', ascending=False)
+
+keep_indices = []
+kept_pgns = []
+
+for idx, row in df_sorted.iterrows():
+    current_pgn = row['Variante_PGN']
+    
+    # Controlliamo se questa variante (essendo più corta) è solo l'inizio di una più lunga già tenuta
+    is_subset = False
+    for kept in kept_pgns:
+        if kept.startswith(current_pgn):
+            is_subset = True
+            break
+            
+    if not is_subset:
+        keep_indices.append(idx)
+        kept_pgns.append(current_pgn)
+
+# Ora abbiamo un dataset purissimo: nessuna pepita è la prosecuzione di un'altra.
+df_clean = df.loc[keep_indices].copy()
+print(f"Riduzione completata: da {len(df)} a {len(df_clean)} pepite strutturalmente indipendenti.")
+
+
+# --- SELEZIONE DELLE 100 PEPITE (ora peschiamo dal dataset pulito) ---
+selection = []
+selected_fens = set()
+
+def add_to_selection(subset_df, limit, category_name):
+    count = 0
+    for _, row in subset_df.iterrows():
+        if count >= limit:
+            break
+        if row['FEN'] not in selected_fens:
+            row_dict = row.to_dict()
+            row_dict['Categoria'] = category_name
+            selection.append(row_dict)
+            selected_fens.add(row['FEN'])
+            count += 1
+
+# 1. Top 20 Storiche (Frequenza maggiore)
+freq_df = df_clean.sort_values(by='Frequenza', ascending=False)
+add_to_selection(freq_df, 20, "Frequenza Storica")
+
+# 2. Top 40 Tattiche (Delta CP più alto)
+tactical_df = df_clean.sort_values(by='Delta_CP', ascending=False)
+add_to_selection(tactical_df, 40, "Tattica Estrema (Alto Delta CP)")
+
+# 3. Top 40 Posizionali (Delta CP più basso, a partire da 0.0)
+positional_df = df_clean.sort_values(by='Delta_CP', ascending=True)
+add_to_selection(positional_df, 40, "Dominio Posizionale (Basso Delta CP)")
+
+# Integrazione se necessario per arrivare a 100
+if len(selection) < 100:
+    remaining_df = df_clean[~df_clean['FEN'].isin(selected_fens)].sort_values(by='Tensione', ascending=False)
+    add_to_selection(remaining_df, 100 - len(selection), "Integrazione Qualimetrica")
+
+print(f"Estrazione completata: {len(selection)} pepite definitive selezionate.")
+print("Scrittura del file PGN in corso...")
+
+# Generazione del file PGN finale
+with open('nuggets_top100.pgn', 'w', encoding='utf-8') as f:
+    for i, row in enumerate(selection, 1):
+        date = row['Data_Recente'] if pd.notna(row['Data_Recente']) else "????.??.??"
+        variante = row['Variante_PGN']
+        
+        f.write(f'[Event "Nuggets Test Suite - {row["Categoria"]}"]\n')
+        f.write(f'[Site "NuggetsManagement"]\n')
+        f.write(f'[Date "{date}"]\n')
+        f.write(f'[Round "{i}"]\n')
+        f.write(f'[White "Motore Test (Bianco)"]\n')
+        f.write(f'[Black "Motore Test (Nero)"]\n')
+        f.write(f'[Result "*"]\n')
+        f.write(f'[Annotator "Fase: {row["Fase"]} | Centro: {row["Centro"]} | Delta CP: {row["Delta_CP"]} | WDL: {row["WDL"]}"]\n')
+        f.write(f'[Target_FEN "{row["FEN"]}"]\n\n')
+        f.write(f'{variante} *\n\n')
+
+print("[OK] File 'nuggets_top100.pgn' generato con successo e ottimizzato!")
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: src\outputLTCWch\nuggets_top100.ini
+////////////////////////////////////////////////////////////////////////////////
+
+[DescrPGN]
+Usage=10
+[SearchBooster]
+DontAskCbb=0
+DontAskCgi=0
+[Environ]
+LastUser=
+TournTitle=
+TournPlace=
+LastPlayer=A
+LastTourn=A
+LastTrnYear=2024
+TournDate=0
+GameDate=0
+GameRound=0
+Sources=1
+Annotators=2
+LastListTop=0
+LastSelected=5
+QLstSelected=0
+Usage=6
+PreviousDBType=0
+CommentedGames=0
+StressTrainActive=1
+StressTestLevel=1
+StressPercentNextLevel=0
+StressReached=0
+StressMax=0
+TrainingWithClock=1
+RandomTraining=1
+
+

@@ -1,0 +1,24 @@
+﻿+ build
+  + NuggetsManagement
+    + localpycs
++ data
+  + output
++ dist
++ docs
+  + outputLTCWch
+    - crosstable_generator.py
+    - generaDiagrammi.py
+    - genera_pgn.py
+    - tournament_visuals.py
++ src
+  + outputLTCWch
+    - generaDiagrammi.py
+    - genera_pgn.py
+  + __pycache__
+  - engine_worker.py
+  - exporter.py
+  - main.py
+  - pgn_producer.py
+  - qualimetria.py
+  - state_manager.py
+- esporta_sorgenti.py

@@ -20,6 +20,8 @@ class NuggetRecord:
     # Metriche (Popolate solo se status == NUGGET)
     win_probability: Optional[float] = None
     delta_win_probability: Optional[float] = None
+    wdl_1: Optional[tuple] = None   # (W, D, L) della linea migliore, punto di vista del Bianco
+    wdl_2: Optional[tuple] = None   # (W, D, L) della seconda linea
     fase: Optional[GamePhase] = None
     centro: Optional[str] = None
     tensione: Optional[int] = None
@@ -74,6 +76,8 @@ class StateManager:
                 # Popola le nuove metriche fornite dal dizionario (senza delta_cp)
                 record.win_probability = metrics.get('win_probability')
                 record.delta_win_probability = metrics.get('delta_win_probability')
+                record.wdl_1 = metrics.get('wdl_1')
+                record.wdl_2 = metrics.get('wdl_2')
                 record.fase = metrics.get('fase')
                 record.centro = metrics.get('centro')
                 record.tensione = metrics.get('tensione')
