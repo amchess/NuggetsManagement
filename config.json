@@ -1,6 +1,6 @@
 {
     "engine_path": "/home/sdp/Stockfish/src/Stockfish19-universal",
-    "pgn_path": "data/WorldChampionships.pgn",
+    "pgn_path": "data/wch.pgn",
     "output_dir": "data/outputWch2026_SF19",
     "concurrency": 47,
     "analysis_time": 60.0,
