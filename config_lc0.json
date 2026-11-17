@@ -1,0 +1,18 @@
+{
+    "engine_path": "/home/sdp/lc0/build/release/lc0",
+    "pgn_path": "data/outputWch2026_SF19/candidati_lc0.csv",
+    "output_dir": "data/outputWch2026_Lc0",
+    "concurrency": 47,
+    "analysis_nodes": 20000,
+    "wdl_tolerance": 0.06,
+    "delta_max": 0.06,
+    "opposite_max": 0.0,
+    "threads": 4,
+    "syzygy_path": "/home/sdp/syzygy",
+    "engine_options": {
+        "WeightsFile": "/home/sdp/lc0/reti/RETE_SCELTA.pb.gz",
+        "Backend": "blas",
+        "MinibatchSize": 32
+    },
+    "nuova_partita_per_posizione": true
+}

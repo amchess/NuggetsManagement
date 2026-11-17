@@ -1,1 +1,6 @@
 chess>=1.10.0
+# script di analisi in docs/outputLTCWch
+numpy
+scipy
+pandas
+matplotlib

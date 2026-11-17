@@ -1,0 +1,15 @@
+{
+    "engine_path": "/home/sdp/Stockfish/src/Stockfish19-universal",
+    "pgn_path": "/home/sdp/ShashChessDev/tests/Tests2026/matches2026/Test2026.pgn",
+    "output_dir": "data/outputTest2026_SF19",
+    "solo_posizione_finale": true,
+    "concurrency": 47,
+    "analysis_time": 60.0,
+    "wdl_tolerance": 0.06,
+    "delta_max": 0.06,
+    "opposite_max": 0.0,
+    "threads": 4,
+    "hash": 2048,
+    "syzygy_path": "/home/sdp/syzygy",
+    "nuova_partita_per_posizione": true
+}

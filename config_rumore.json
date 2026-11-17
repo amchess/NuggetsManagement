@@ -1,0 +1,14 @@
+{
+    "engine_path": "/home/sdp/Stockfish/src/Stockfish19-universal",
+    "pgn_path": "data/outputWch2026_SF19/nuggets_pool.csv",
+    "output_dir": "data/rumore/run01",
+    "concurrency": 47,
+    "analysis_time": 60.0,
+    "wdl_tolerance": 0.06,
+    "delta_max": 0.06,
+    "opposite_max": 0.0,
+    "threads": 4,
+    "hash": 2048,
+    "syzygy_path": "/home/sdp/syzygy",
+    "nuova_partita_per_posizione": true
+}

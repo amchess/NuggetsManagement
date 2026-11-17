@@ -64,6 +64,42 @@ The software's behavior is entirely managed through the `config.json` file locat
 * `hash`: The size of the Hash Table (in MB) allocated per instance (e.g., `64`).
 * `syzygy_path`: (Optional) The path to the endgame tablebases (e.g., `"C:\\syzygy"`). Leave empty `""` if not used.
 
+## 🔬 2026 revision: long runs, resume and other engines
+
+The miner can now run for days on a many-core machine and be restarted safely.
+
+* **Registry of every position.** Each analysed position is appended to `tutte_le_posizioni.csv`
+  in the output folder (WDL of the two best moves, Pwin, Delta, scores, moves, depth, nodes, NPS,
+  time, phase, centre, status). The file is flushed line by line: after an interruption the same
+  command resumes and skips positions already analysed. Thresholds can be changed later without
+  re-running the engine.
+* **Engine-agnostic.** Options are sent only if the engine declares them, so the same miner works
+  with Stockfish, ShashChess or Lc0. `analysis_nodes` replaces `analysis_time` with a fixed node
+  budget (recommended for Lc0 on CPU); `engine_options` passes engine-specific UCI options.
+* **Inputs.** PGN (all positions, or only the final one of each game), EPD and CSV with a `FEN` column.
+
+New keys in `config.json`:
+
+| Key | Meaning |
+|---|---|
+| `delta_max` | maximum Delta WDL between the two best moves (default: `wdl_tolerance`) |
+| `opposite_max` | maximum probability of the unfavoured result (L for 0.75 nuggets, W for 0.25 nuggets) |
+| `nuova_partita_per_posizione` | send `ucinewgame` (clear hash) before each position |
+| `registro`, `registro_csv` | write the registry of all positions (default `true`, `tutte_le_posizioni.csv`) |
+| `solo_posizione_finale` | analyse only the final position of each PGN game (e.g. opening books) |
+| `analysis_nodes` | fixed node budget instead of `analysis_time` |
+| `engine_options` | extra UCI options, e.g. `WeightsFile` and `Backend` for Lc0 |
+
+Command line: `python src/main.py --config FILE [--conta] [--output-dir DIR]`. `--conta` counts the
+distinct positions and estimates the duration without starting the engine.
+
+Recommended setting on a 192-core machine: `threads` 4 and `concurrency` 47 (188 search threads on
+physical cores). For Lc0 on CPU set `OPENBLAS_NUM_THREADS=1` in the environment.
+
+The experiments of the 2026 revision (cutechess-cli scripts, statistics, Lc0 cross-validation,
+NPS measurements) are in `docs/revisione2026/`; `docs/revisione2026/LEGGIMI.md` lists the
+commands in order.
+
 ## 📦 Generating the Executable (Standalone)
 
 You can compile NuggetsManagement into a single executable file to distribute it without requiring the end user to install Python or set up a virtual environment. We use `pyinstaller`.

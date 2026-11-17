@@ -585,6 +585,1163 @@ if __name__ == "__main__":
     main()
 
 ////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: docs\revisione2026\confronta_oracoli.py
+////////////////////////////////////////////////////////////////////////////////
+
+#!/usr/bin/env python3
+"""
+Validazione incrociata delle pepite con un secondo oracolo (Lc0), richiesta da R1.4 e R2.3.
+
+Due comandi:
+
+  seleziona  dal registro di Stockfish (tutte_le_posizioni.csv) sceglie le posizioni da far
+             rianalizzare a Lc0: tutte le pepite e le posizioni vicine ai bersagli 0,75 / 0,25
+             (pepite e quasi-pepite servono entrambe, altrimenti il kappa non e' calcolabile).
+
+  confronta  confronta i due registri (stesse FEN): correlazione di Pwin e di Delta WDL,
+             accordo di Bland-Altman, accordo sulla mossa migliore, matrice di confusione e
+             kappa di Cohen sulla classificazione "pepita", elenco delle pepite solo-Stockfish.
+
+Richiede numpy e scipy. Esempi:
+  python confronta_oracoli.py seleziona --registro ../../data/outputWch2026_SF19/tutte_le_posizioni.csv \
+         --out ../../data/outputWch2026_SF19/candidati_lc0.csv --finestra 0.15
+  python confronta_oracoli.py confronta --sf .../tutte_le_posizioni.csv --lc0 .../Lc0/tutte_le_posizioni.csv \
+         --out confronto_oracoli
+"""
+import argparse
+import collections
+import csv
+import json
+import math
+import sys
+
+import numpy as np
+from scipy import stats as sps
+
+RNG = np.random.default_rng(20261116)
+
+
+def leggi(path):
+    with open(path, newline='', encoding='utf-8') as f:
+        return [r for r in csv.DictReader(f) if r.get('Stato') in ('Nugget', 'Non nugget') and r.get('W1') not in (None, '')]
+
+
+def num(r, k):
+    return float(r[k])
+
+
+def pepita(r, tol, delta, opp):
+    """Stessa regola di src/registro.py: Pwin dal punto di vista del Bianco."""
+    w1, d1, l1 = num(r, 'W1'), num(r, 'D1'), num(r, 'L1')
+    w2, d2 = num(r, 'W2'), num(r, 'D2')
+    p1, p2 = w1 + d1 / 2, w2 + d2 / 2
+    e = 1e-9
+    bianca = abs(p1 - 0.75) <= tol + e and l1 <= opp + e
+    nera = abs(p1 - 0.25) <= tol + e and w1 <= opp + e
+    return (bianca or nera) and abs(p1 - p2) <= delta + e
+
+
+def kappa(a, b):
+    a, b = np.asarray(a, bool), np.asarray(b, bool)
+    po = np.mean(a == b)
+    pe = a.mean() * b.mean() + (1 - a.mean()) * (1 - b.mean())
+    return float((po - pe) / (1 - pe)) if pe < 1 else float('nan')
+
+
+def cmd_seleziona(args):
+    righe = leggi(args.registro)
+    scelte, altre = [], []
+    for r in righe:
+        p1 = num(r, 'Pwin1')
+        vicina = abs(p1 - 0.75) <= args.finestra or abs(p1 - 0.25) <= args.finestra
+        if r['Stato'] == 'Nugget':
+            scelte.append(r)
+        elif vicina:
+            altre.append(r)
+    if args.max and len(scelte) + len(altre) > args.max:
+        k = max(0, args.max - len(scelte))
+        idx = RNG.choice(len(altre), size=min(k, len(altre)), replace=False)
+        altre = [altre[i] for i in sorted(idx)]
+    with open(args.out, 'w', newline='', encoding='utf-8') as f:
+        w = csv.writer(f)
+        w.writerow(['FEN', 'Variante_PGN', 'Data'])
+        for r in scelte + altre:
+            w.writerow([r['FEN'], r.get('Variante_PGN', ''), r.get('Data', '')])
+    print(f'[OK] {args.out}: {len(scelte)} pepite + {len(altre)} posizioni vicine ai bersagli (finestra ±{args.finestra})')
+
+
+def cmd_confronta(args):
+    sf = {r['FEN']: r for r in leggi(args.sf)}
+    lc = {r['FEN']: r for r in leggi(args.lc0)}
+    comuni = sorted(set(sf) & set(lc))
+    if len(comuni) < 10:
+        sys.exit(f'[ERRORE] Solo {len(comuni)} FEN in comune: controllare i file.')
+    p_sf = np.array([num(sf[k], 'Pwin1') for k in comuni])
+    p_lc = np.array([num(lc[k], 'Pwin1') for k in comuni])
+    d_sf = np.array([num(sf[k], 'Delta') for k in comuni])
+    d_lc = np.array([num(lc[k], 'Delta') for k in comuni])
+
+    def rho_ic(x, y, B=2000):
+        n = len(x)
+        idx = RNG.integers(0, n, size=(B, n))
+        v = [sps.spearmanr(x[i], y[i]).statistic for i in idx]
+        return float(sps.spearmanr(x, y).statistic), float(np.percentile(v, 2.5)), float(np.percentile(v, 97.5))
+
+    R = dict(posizioni_comuni=len(comuni), solo_sf=len(set(sf) - set(lc)), solo_lc0=len(set(lc) - set(sf)))
+    R['pwin_spearman'] = rho_ic(p_sf, p_lc)
+    R['pwin_pearson'] = float(np.corrcoef(p_sf, p_lc)[0, 1])
+    R['delta_spearman'] = rho_ic(d_sf, d_lc)
+    diff = p_lc - p_sf
+    R['bland_altman_pwin'] = dict(media=float(diff.mean()), ds=float(diff.std(ddof=1)),
+                                  limiti=[float(diff.mean() - 1.96 * diff.std(ddof=1)), float(diff.mean() + 1.96 * diff.std(ddof=1))])
+    m1 = [sf[k].get('Mossa1') == lc[k].get('Mossa1') for k in comuni]
+    m12 = [sf[k].get('Mossa1') in (lc[k].get('Mossa1'), lc[k].get('Mossa2')) for k in comuni]
+    R['accordo_mossa_migliore'] = float(np.mean(m1))
+    R['mossa_sf_fra_prime_due_lc0'] = float(np.mean(m12))
+
+    livelli = {'pool': (args.tol, args.delta_pool), 'top': (args.tol_top, args.delta_top)}
+    discordanti = []
+    for nome, (tol, dl) in livelli.items():
+        a = [pepita(sf[k], tol, dl, args.opposite_max) for k in comuni]
+        b = [pepita(lc[k], tol, dl, args.opposite_max) for k in comuni]
+        n11 = sum(x and y for x, y in zip(a, b))
+        n10 = sum(x and not y for x, y in zip(a, b))
+        n01 = sum(y and not x for x, y in zip(a, b))
+        n00 = len(a) - n11 - n10 - n01
+        kb = []
+        A, Bv = np.array(a), np.array(b)
+        for i in RNG.integers(0, len(a), size=(1000, len(a))):
+            kb.append(kappa(A[i], Bv[i]))
+        R[f'classificazione_{nome}'] = dict(
+            soglie=dict(tolleranza_pwin=tol, delta_max=dl, opposite_max=args.opposite_max),
+            entrambi=n11, solo_sf=n10, solo_lc0=n01, nessuno=n00,
+            quota_pepite_sf_confermate=(n11 / (n11 + n10)) if n11 + n10 else None,
+            kappa=kappa(a, b), kappa_ic=[float(np.nanpercentile(kb, 2.5)), float(np.nanpercentile(kb, 97.5))])
+        if nome == 'pool':
+            for k, x, y in zip(comuni, a, b):
+                if x != y:
+                    discordanti.append(dict(FEN=k, pepita_sf=x, pepita_lc0=y, Pwin_sf=sf[k]['Pwin1'], Pwin_lc0=lc[k]['Pwin1'],
+                                            Delta_sf=sf[k]['Delta'], Delta_lc0=lc[k]['Delta'],
+                                            Fase=sf[k].get('Fase', ''), Centro=sf[k].get('Centro', ''),
+                                            Variante_PGN=sf[k].get('Variante_PGN', '')))
+    solo_sf = [d for d in discordanti if d['pepita_sf']]
+    R['solo_sf_per_fase'] = dict(collections.Counter(d['Fase'] for d in solo_sf))
+    R['solo_sf_per_centro'] = dict(collections.Counter(d['Centro'] for d in solo_sf))
+
+    with open(args.out + '.json', 'w', encoding='utf-8') as f:
+        json.dump(R, f, indent=1, ensure_ascii=False)
+    with open(args.out + '_discordanti.csv', 'w', newline='', encoding='utf-8') as f:
+        if discordanti:
+            w = csv.DictWriter(f, fieldnames=list(discordanti[0]))
+            w.writeheader()
+            w.writerows(discordanti)
+    L = [f"# Stockfish contro Lc0 ({R['posizioni_comuni']} posizioni in comune)", '',
+         f"Pwin: rho di Spearman {R['pwin_spearman'][0]:.3f} [{R['pwin_spearman'][1]:.3f}; {R['pwin_spearman'][2]:.3f}], r di Pearson {R['pwin_pearson']:.3f}.",
+         f"Delta WDL: rho di Spearman {R['delta_spearman'][0]:.3f} [{R['delta_spearman'][1]:.3f}; {R['delta_spearman'][2]:.3f}].",
+         f"Bland-Altman (Lc0 - Stockfish) su Pwin: media {R['bland_altman_pwin']['media']:+.3f}, limiti [{R['bland_altman_pwin']['limiti'][0]:+.3f}; {R['bland_altman_pwin']['limiti'][1]:+.3f}].",
+         f"Stessa mossa migliore: {100 * R['accordo_mossa_migliore']:.1f}%; mossa di Stockfish fra le prime due di Lc0: {100 * R['mossa_sf_fra_prime_due_lc0']:.1f}%.", '']
+    for nome in ('pool', 'top'):
+        c = R[f'classificazione_{nome}']
+        conf = f"{100 * c['quota_pepite_sf_confermate']:.1f}%" if c['quota_pepite_sf_confermate'] is not None else 'n.d.'
+        L.append(f"Classificazione {nome} (Pwin ±{c['soglie']['tolleranza_pwin']}, Delta ≤ {c['soglie']['delta_max']}): "
+                 f"entrambi {c['entrambi']}, solo Stockfish {c['solo_sf']}, solo Lc0 {c['solo_lc0']}, nessuno {c['nessuno']}; "
+                 f"kappa {c['kappa']:.3f} [{c['kappa_ic'][0]:.3f}; {c['kappa_ic'][1]:.3f}]; pepite di Stockfish confermate: {conf}.")
+    with open(args.out + '.md', 'w', encoding='utf-8') as f:
+        f.write('\n'.join(L))
+    print('\n'.join(L))
+    print(f'\n[OK] Scritti {args.out}.json, {args.out}.md e {args.out}_discordanti.csv')
+
+
+def main():
+    ap = argparse.ArgumentParser(description='Validazione delle pepite con un secondo oracolo')
+    sub = ap.add_subparsers(dest='cmd', required=True)
+    s = sub.add_parser('seleziona', help='sceglie le posizioni da rianalizzare con Lc0')
+    s.add_argument('--registro', required=True, help='tutte_le_posizioni.csv di Stockfish')
+    s.add_argument('--out', required=True, help='CSV da usare come pgn_path in config_lc0.json')
+    s.add_argument('--finestra', type=float, default=0.15, help='distanza massima di Pwin dai bersagli (default 0,15)')
+    s.add_argument('--max', type=int, default=0, help='numero massimo di posizioni (0 = tutte)')
+    c = sub.add_parser('confronta', help='confronta i registri di Stockfish e di Lc0')
+    c.add_argument('--sf', required=True)
+    c.add_argument('--lc0', required=True)
+    c.add_argument('--tol', type=float, default=0.06, help='tolleranza su Pwin per il pool (default 0,06)')
+    c.add_argument('--delta-pool', type=float, default=0.06, help='Delta massimo per il pool (default 0,06)')
+    c.add_argument('--tol-top', type=float, default=0.03, help='tolleranza su Pwin per le Top-N (default 0,03)')
+    c.add_argument('--delta-top', type=float, default=0.03, help='Delta massimo per le Top-N (default 0,03)')
+    c.add_argument('--opposite-max', type=float, default=0.0)
+    c.add_argument('--out', default='confronto_oracoli')
+    args = ap.parse_args()
+    {'seleziona': cmd_seleziona, 'confronta': cmd_confronta}[args.cmd](args)
+
+
+if __name__ == '__main__':
+    main()
+
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: docs\revisione2026\misura_nps.py
+////////////////////////////////////////////////////////////////////////////////
+
+"""
+misura_nps.py - velocita' di ricerca (NPS) dei motori nelle condizioni degli esperimenti.
+
+Risponde a R1, commento minore 3: invece di una sola misura, ripete la misura e riporta media,
+deviazione standard e intervallo di confidenza, per ogni motore e per il rapporto con il motore
+di riferimento.
+
+Protocollo:
+  - per ogni ripetizione si misurano i motori a turno, in ordine alternato (ABCD, DCBA, ...),
+    per non attribuire a un motore una deriva della macchina (temperatura, frequenza);
+  - in ogni blocco girano --paralleli istanze dello stesso motore insieme, ciascuna con
+    --threads thread: con 47 istanze x 4 thread il carico e' quello dei match;
+  - ogni istanza analizza le stesse --n posizioni per --movetime millisecondi ciascuna,
+    dopo ucinewgame; si registrano NPS, nodi e profondita' dell'ultima riga info.
+
+Solo libreria standard: nessuna dipendenza da python-chess.
+
+Uso:
+  python misura_nps.py --motore Stockfish19=/percorso/sf --motore ShashChess42=/percorso/sc \
+      --posizioni nuggets_top100.epd --riferimento Stockfish19 --out nps_2026
+Opzioni utili: --ripetizioni 5 --n 10 --movetime 5000 --paralleli 47 --threads 4 --hash 2048
+               --opzione ShashChess42:"Persisted learning"=Off  (opzioni UCI specifiche)
+"""
+import argparse
+import csv
+import json
+import math
+import random
+import statistics
+import subprocess
+import time
+from concurrent.futures import ThreadPoolExecutor
+
+
+def leggi_posizioni(percorso, n):
+    fens = []
+    with open(percorso, encoding="utf-8") as f:
+        for riga in f:
+            campi = riga.split()
+            if len(campi) >= 4 and "/" in campi[0]:
+                fens.append(" ".join(campi[:4]) + " 0 1")
+            if len(fens) >= n:
+                break
+    if not fens:
+        raise SystemExit(f"[ERRORE] nessuna posizione EPD in {percorso}")
+    return fens
+
+
+class Motore:
+    def __init__(self, cmd, opzioni):
+        self.p = subprocess.Popen([cmd], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                  stderr=subprocess.DEVNULL, text=True, bufsize=1)
+        self.manda("uci")
+        dichiarate = set()
+        for riga in self.attendi("uciok"):
+            if riga.startswith("option name "):
+                dichiarate.add(riga[len("option name "):].split(" type ")[0])
+        for nome, valore in opzioni.items():
+            if nome in dichiarate:
+                self.manda(f"setoption name {nome} value {valore}")
+        self.manda("isready")
+        self.attendi("readyok")
+
+    def manda(self, testo):
+        self.p.stdin.write(testo + "\n")
+        self.p.stdin.flush()
+
+    def attendi(self, parola):
+        righe = []
+        while True:
+            riga = self.p.stdout.readline()
+            if not riga:
+                raise RuntimeError("il motore ha chiuso l'output")
+            riga = riga.strip()
+            righe.append(riga)
+            if riga.split(" ")[0] == parola:
+                return righe
+
+    def misura(self, fen, movetime):
+        self.manda("ucinewgame")
+        self.manda("isready")
+        self.attendi("readyok")
+        self.manda(f"position fen {fen}")
+        self.manda(f"go movetime {movetime}")
+        ultimo = {}
+        for riga in self.attendi("bestmove"):
+            t = riga.split()
+            if t and t[0] == "info" and "nps" in t:
+                for chiave in ("nps", "nodes", "depth", "time"):
+                    if chiave in t:
+                        try:
+                            ultimo[chiave] = int(t[t.index(chiave) + 1])
+                        except (ValueError, IndexError):
+                            pass
+        return ultimo
+
+    def chiudi(self):
+        try:
+            self.manda("quit")
+            self.p.wait(timeout=10)
+        except Exception:
+            self.p.kill()
+
+
+def blocco(nome, cmd, opzioni, fens, movetime, paralleli):
+    """Avvia `paralleli` istanze dello stesso motore e misura tutte le posizioni in contemporanea."""
+    def una_istanza(i):
+        m = Motore(cmd, opzioni)
+        try:
+            return [dict(motore=nome, istanza=i, posizione=k, **m.misura(f, movetime))
+                    for k, f in enumerate(fens)]
+        finally:
+            m.chiudi()
+    with ThreadPoolExecutor(max_workers=paralleli) as ex:
+        return [r for lista in ex.map(una_istanza, range(paralleli)) for r in lista]
+
+
+def ic_media(valori, livello=0.95):
+    n = len(valori)
+    m = statistics.fmean(valori)
+    if n < 2:
+        return m, float("nan"), (float("nan"), float("nan"))
+    s = statistics.stdev(valori)
+    # quantile t di Student approssimato (Cornish-Fisher) per evitare scipy
+    z = statistics.NormalDist().inv_cdf(0.5 + livello / 2)
+    gl = n - 1
+    t = z + (z ** 3 + z) / (4 * gl) + (5 * z ** 5 + 16 * z ** 3 + 3 * z) / (96 * gl ** 2)
+    h = t * s / math.sqrt(n)
+    return m, s, (m - h, m + h)
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Misura ripetuta degli NPS sotto carico")
+    ap.add_argument("--motore", action="append", required=True, help="NOME=ESEGUIBILE (ripetibile)")
+    ap.add_argument("--posizioni", required=True, help="file .epd (si usano le prime --n righe)")
+    ap.add_argument("--riferimento", default=None, help="motore di riferimento per i rapporti")
+    ap.add_argument("--opzione", action="append", default=[],
+                    help='opzione specifica: NOME:Opzione=valore (es. ShashChess42:"Persisted learning"=Off)')
+    ap.add_argument("--ripetizioni", type=int, default=5)
+    ap.add_argument("--n", type=int, default=10)
+    ap.add_argument("--movetime", type=int, default=5000, help="millisecondi per posizione")
+    ap.add_argument("--paralleli", type=int, default=47)
+    ap.add_argument("--threads", type=int, default=4)
+    ap.add_argument("--hash", type=int, default=2048)
+    ap.add_argument("--seme", type=int, default=2026)
+    ap.add_argument("--out", default="nps_2026")
+    a = ap.parse_args()
+
+    motori = dict(m.split("=", 1) for m in a.motore)
+    specifiche = {nome: {} for nome in motori}
+    for o in a.opzione:
+        nome, resto = o.split(":", 1)
+        chiave, valore = resto.split("=", 1)
+        specifiche.setdefault(nome, {})[chiave.strip('"')] = valore
+    fens = leggi_posizioni(a.posizioni, a.n)
+    rif = a.riferimento or next(iter(motori))
+    ordine = list(motori)
+    random.Random(a.seme).shuffle(ordine)
+
+    righe, inizio = [], time.time()
+    for r in range(a.ripetizioni):
+        turno = ordine if r % 2 == 0 else ordine[::-1]
+        for nome in turno:
+            opzioni = {"Threads": a.threads, "Hash": a.hash, **specifiche.get(nome, {})}
+            t0 = time.time()
+            ris = blocco(nome, motori[nome], opzioni, fens, a.movetime, a.paralleli)
+            for x in ris:
+                x["ripetizione"] = r
+            righe.extend(ris)
+            print(f"[*] ripetizione {r + 1}/{a.ripetizioni} {nome}: {len(ris)} misure in {time.time() - t0:.0f} s")
+
+    with open(a.out + ".csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["ripetizione", "motore", "istanza", "posizione",
+                                          "nps", "nodes", "depth", "time"], extrasaction="ignore")
+        w.writeheader()
+        w.writerows(righe)
+
+    # media per ripetizione (unita' indipendente), poi media e IC fra ripetizioni
+    per_rip = {}
+    for x in righe:
+        if "nps" in x:
+            per_rip.setdefault((x["motore"], x["ripetizione"]), []).append(x)
+    sintesi = {}
+    for nome in motori:
+        nps = [statistics.fmean(v["nps"] for v in per_rip[(nome, r)])
+               for r in range(a.ripetizioni) if (nome, r) in per_rip]
+        prof = [v.get("depth", 0) for r in range(a.ripetizioni) for v in per_rip.get((nome, r), [])]
+        m, s, ic = ic_media(nps)
+        sintesi[nome] = {"nps_medio_istanza": m, "ds_fra_ripetizioni": s, "ic95": ic,
+                         "cv_percento": 100 * s / m if m else float("nan"),
+                         "profondita_mediana": statistics.median(prof) if prof else None}
+        if nome != rif:
+            rapporti = [statistics.fmean(v["nps"] for v in per_rip[(nome, r)]) /
+                        statistics.fmean(v["nps"] for v in per_rip[(rif, r)])
+                        for r in range(a.ripetizioni) if (nome, r) in per_rip and (rif, r) in per_rip]
+            rm, rs, ric = ic_media(rapporti)
+            sintesi[nome][f"rapporto_su_{rif}"] = {"media": rm, "ds": rs, "ic95": ric}
+
+    meta = {"posizioni": a.posizioni, "n_posizioni": len(fens), "movetime_ms": a.movetime,
+            "paralleli": a.paralleli, "threads": a.threads, "hash": a.hash,
+            "ripetizioni": a.ripetizioni, "durata_s": round(time.time() - inizio)}
+    with open(a.out + ".json", "w", encoding="utf-8") as f:
+        json.dump({"condizioni": meta, "sintesi": sintesi}, f, indent=2, ensure_ascii=False)
+
+    righe_md = [f"# NPS sotto carico ({a.paralleli} istanze x {a.threads} thread, {a.movetime} ms per posizione, "
+                f"{len(fens)} posizioni, {a.ripetizioni} ripetizioni)", "",
+                "| Motore | NPS medio per istanza | DS fra ripetizioni | IC 95% | CV % | Profondita' mediana |"
+                f" Rapporto su {rif} [IC 95%] |", "|---|---|---|---|---|---|---|"]
+    for nome, s in sintesi.items():
+        rap = s.get(f"rapporto_su_{rif}")
+        rap_txt = f"{rap['media']:.3f} [{rap['ic95'][0]:.3f}; {rap['ic95'][1]:.3f}]" if rap else "1"
+        righe_md.append(f"| {nome} | {s['nps_medio_istanza']:,.0f} | {s['ds_fra_ripetizioni']:,.0f} | "
+                        f"[{s['ic95'][0]:,.0f}; {s['ic95'][1]:,.0f}] | {s['cv_percento']:.1f} | "
+                        f"{s['profondita_mediana']} | {rap_txt} |")
+    with open(a.out + ".md", "w", encoding="utf-8") as f:
+        f.write("\n".join(righe_md) + "\n")
+    print("\n".join(righe_md))
+    print(f"[OK] Scritti {a.out}.csv, {a.out}.json e {a.out}.md")
+
+
+if __name__ == "__main__":
+    main()
+
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: docs\revisione2026\stabilita_registri.py
+////////////////////////////////////////////////////////////////////////////////
+
+"""
+stabilita_registri.py - ripetibilita' delle misure WDL fra analisi ripetute delle stesse posizioni.
+
+Serve a giustificare le soglie (R1, commento minore 1): se la variabilita' di Pwin e di Delta WDL
+fra due analisi identiche e' confrontabile con la soglia, la classificazione "nugget" dipende dal
+caso. Si confrontano K registri (tutte_le_posizioni.csv) prodotti dal miner con la stessa
+configurazione (config_rumore.json, una cartella per ripetizione).
+
+Uscite: per ogni livello (pool, top) la quota di posizioni classificate sempre allo stesso modo,
+la deviazione standard entro posizione di Pwin e di Delta, la quota di posizioni in cui cambia la
+mossa migliore, e la soglia minima di Delta compatibile con il rumore misurato.
+
+Uso:
+  python stabilita_registri.py --registri data/rumore/run0*/tutte_le_posizioni.csv --out stabilita_2026
+"""
+import argparse
+import csv
+import json
+
+import numpy as np
+
+EPS = 1e-9
+
+
+def leggi(path):
+    with open(path, newline="", encoding="utf-8") as f:
+        return {r["FEN"]: r for r in csv.DictReader(f)
+                if r.get("Stato") in ("Nugget", "Non nugget") and r.get("W1") not in (None, "")}
+
+
+def misure(r):
+    w1, d1, l1 = (float(r[k]) for k in ("W1", "D1", "L1"))
+    w2, d2 = float(r["W2"]), float(r["D2"])
+    p1, p2 = w1 + d1 / 2, w2 + d2 / 2
+    return p1, abs(p1 - p2), w1, l1, r.get("Mossa1", "")
+
+
+def pepita(p1, delta, w1, l1, tol, dmax, opp):
+    bianca = abs(p1 - 0.75) <= tol + EPS and l1 <= opp + EPS
+    nera = abs(p1 - 0.25) <= tol + EPS and w1 <= opp + EPS
+    return (bianca or nera) and delta <= dmax + EPS
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Ripetibilita' delle misure WDL fra registri")
+    ap.add_argument("--registri", nargs="+", required=True, help="almeno due tutte_le_posizioni.csv")
+    ap.add_argument("--tol", type=float, default=0.06)
+    ap.add_argument("--delta-pool", type=float, default=0.06)
+    ap.add_argument("--tol-top", type=float, default=0.03)
+    ap.add_argument("--delta-top", type=float, default=0.03)
+    ap.add_argument("--opposite-max", type=float, default=0.0)
+    ap.add_argument("--out", default="stabilita_2026")
+    a = ap.parse_args()
+    if len(a.registri) < 2:
+        raise SystemExit("[ERRORE] servono almeno due registri")
+
+    regs = [leggi(p) for p in a.registri]
+    comuni = sorted(set.intersection(*(set(r) for r in regs)))
+    if not comuni:
+        raise SystemExit("[ERRORE] nessuna posizione comune ai registri")
+    k = len(regs)
+    P = np.array([[misure(r[f])[0] for r in regs] for f in comuni])
+    D = np.array([[misure(r[f])[1] for r in regs] for f in comuni])
+    W = np.array([[misure(r[f])[2] for r in regs] for f in comuni])
+    L = np.array([[misure(r[f])[3] for r in regs] for f in comuni])
+    M = [[misure(r[f])[4] for r in regs] for f in comuni]
+
+    ds_p = P.std(axis=1, ddof=1)
+    ds_d = D.std(axis=1, ddof=1)
+    cambio_mossa = np.mean([len(set(m)) > 1 for m in M])
+    ris = {"registri": a.registri, "ripetizioni": k, "posizioni_comuni": len(comuni),
+           "ds_entro_posizione": {
+               "Pwin_media": float(ds_p.mean()), "Pwin_p95": float(np.percentile(ds_p, 95)),
+               "Delta_media": float(ds_d.mean()), "Delta_mediana": float(np.median(ds_d)),
+               "Delta_p95": float(np.percentile(ds_d, 95))},
+           "quota_cambio_mossa_migliore": float(cambio_mossa),
+           "livelli": {}}
+    for nome, tol, dmax in (("pool", a.tol, a.delta_pool), ("top", a.tol_top, a.delta_top)):
+        C = np.array([[pepita(P[i, j], D[i, j], W[i, j], L[i, j], tol, dmax, a.opposite_max)
+                       for j in range(k)] for i in range(len(comuni))])
+        mai, sempre = ~C.any(axis=1), C.all(axis=1)
+        almeno_una = C.any(axis=1)
+        ris["livelli"][nome] = {
+            "tolleranza_Pwin": tol, "delta_max": dmax,
+            "pepite_per_ripetizione": [int(x) for x in C.sum(axis=0)],
+            "pepita_in_tutte": int(sempre.sum()), "pepita_in_almeno_una": int(almeno_una.sum()),
+            "classificazione_stabile": float(np.mean(sempre | mai)),
+            "conferma_fra_le_pepite": float(sempre.sum() / almeno_una.sum()) if almeno_una.any() else None}
+    # soglia di Delta sotto la quale la classificazione e' dominata dal rumore:
+    # due volte la DS entro posizione (95° percentile) della differenza fra due analisi
+    ris["delta_minimo_consigliato"] = float(2 * np.percentile(ds_d, 95))
+
+    with open(a.out + ".json", "w", encoding="utf-8") as f:
+        json.dump(ris, f, indent=2, ensure_ascii=False)
+    e = ris["ds_entro_posizione"]
+    md = [f"# Ripetibilita' delle misure WDL ({k} analisi ripetute, {len(comuni)} posizioni comuni)", "",
+          f"DS entro posizione di Pwin: media {e['Pwin_media']:.4f}, 95° percentile {e['Pwin_p95']:.4f}.",
+          f"DS entro posizione di Delta WDL: media {e['Delta_media']:.4f}, mediana {e['Delta_mediana']:.4f}, "
+          f"95° percentile {e['Delta_p95']:.4f}.",
+          f"Posizioni in cui cambia la mossa migliore fra le ripetizioni: {100 * cambio_mossa:.1f}%.",
+          f"Soglia minima di Delta consigliata (2 x DS al 95° percentile): {ris['delta_minimo_consigliato']:.3f}.", ""]
+    for nome, v in ris["livelli"].items():
+        conf = v["conferma_fra_le_pepite"]
+        md.append(f"Livello {nome} (Pwin ±{v['tolleranza_Pwin']}, Delta ≤ {v['delta_max']}): pepite per ripetizione "
+                  f"{v['pepite_per_ripetizione']}; pepita in tutte {v['pepita_in_tutte']}, in almeno una "
+                  f"{v['pepita_in_almeno_una']}; classificazione stabile {100 * v['classificazione_stabile']:.1f}%; "
+                  f"conferma fra le pepite {100 * conf:.1f}%." if conf is not None else
+                  f"Livello {nome}: nessuna pepita.")
+    with open(a.out + ".md", "w", encoding="utf-8") as f:
+        f.write("\n".join(md) + "\n")
+    print("\n".join(md))
+    print(f"[OK] Scritti {a.out}.json e {a.out}.md")
+
+
+if __name__ == "__main__":
+    main()
+
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: docs\revisione2026\statistiche_match.py
+////////////////////////////////////////////////////////////////////////////////
+
+#!/usr/bin/env python3
+"""
+Statistiche dei match e dei tornei giocati con cutechess-cli sulle pepite.
+
+Calcola, per ogni coppia di motori, i risultati con tre modelli (trinomiale, pentanomiale
+a coppie di partite a colori invertiti, cluster per posizione), il test di McNemar sulla
+conversione della parte favorita, i rating di Bradley-Terry con intervalli bootstrap,
+la verifica che il disegno sia incrociato, le proprieta' delle posizioni (parte favorita,
+partite decisive) e l'analisi di potenza. Facoltativi: test d'interazione fra due insiemi
+di posizioni (es. pepite contro libro di controllo) e regressione del risultato su Delta WDL.
+
+Non richiede python-chess; richiede numpy e scipy.
+
+Esempi:
+  python statistiche_match.py --pgn match.pgn --a ShashChess42 --b Stockfish19 --out match
+  python statistiche_match.py --pgn rr_*.pgn --ancora Stockfish19 --elo-ancora 3670 --out roundrobin
+  python statistiche_match.py --pgn match.pgn --aperture nuggets_pool.epd --a ShashChess42 --b Stockfish19 \
+         --confronta controllo_uho.pgn --out confronto
+"""
+import argparse
+import collections
+import datetime
+import json
+import math
+import re
+import statistics as st
+import sys
+
+import numpy as np
+from scipy import stats as sps
+
+RNG = np.random.default_rng(20261116)
+
+# ------------------------------------------------------------------ lettura PGN
+HEADER_RE = re.compile(r'^\[(\w+)\s+"(.*)"\]\s*$')
+EVAL_RE = re.compile(r'^\s*([+-]?M?\d+(?:\.\d+)?)/(\d+)\s+([\d.]+)s')
+
+
+def _tokens(text):
+    """Mosse SAN e relativo commento, nell'ordine."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == '{':
+            j = text.index('}', i)
+            if out:
+                san, prev = out[-1]
+                out[-1] = (san, (prev + ' | ' if prev else '') + text[i + 1:j].strip())
+            i = j + 1
+            continue
+        if c == '(':                                   # varianti: ignorate
+            depth, j = 1, i + 1
+            while depth and j < n:
+                depth += {'(': 1, ')': -1}.get(text[j], 0)
+                j += 1
+            i = j
+            continue
+        if c.isspace():
+            i += 1
+            continue
+        j = i
+        while j < n and not text[j].isspace() and text[j] not in '{(':
+            j += 1
+        tok = re.sub(r'^\d+\.(\.\.)?', '', text[i:j])
+        i = j
+        if tok and tok not in ('1-0', '0-1', '1/2-1/2', '*') and not tok.startswith('$'):
+            out.append((tok, ''))
+    return out
+
+
+def leggi_pgn(path):
+    partite, headers, corpo, in_mosse = [], {}, [], False
+
+    def chiudi():
+        if headers:
+            t = _tokens(' '.join(corpo))
+            partite.append({'h': dict(headers), 'mosse': [a for a, _ in t], 'com': [b for _, b in t], 'file': path})
+
+    with open(path, encoding='utf-8', errors='replace') as fh:
+        for riga in fh:
+            m = HEADER_RE.match(riga.rstrip('\n'))
+            if m:
+                if in_mosse:
+                    chiudi()
+                    headers, corpo, in_mosse = {}, [], False
+                headers[m.group(1)] = m.group(2)
+            elif riga.strip():
+                in_mosse = True
+                corpo.append(riga.strip())
+    chiudi()
+    return partite
+
+
+def lunghezza_libro(g):
+    k = 0
+    while k < len(g['com']) and g['com'][k].startswith('book'):
+        k += 1
+    return k
+
+
+def valuta(commento):
+    m = EVAL_RE.match(commento or '')
+    if not m:
+        return None
+    raw = m.group(1)
+    v = (100.0 if not raw.startswith('-') else -100.0) if 'M' in raw else float(raw)
+    return v, int(m.group(2)), float(m.group(3))
+
+
+def prima_valutazione_bianco(g):
+    """Prima valutazione fuori libro, dal punto di vista del Bianco (None se assente)."""
+    pari = chi_muove_per_primo(g) == 'w'
+    for k in range(lunghezza_libro(g), len(g['mosse'])):
+        e = valuta(g['com'][k])
+        if e:
+            bianco_muove = (k % 2 == 0) == pari
+            return e[0] if bianco_muove else -e[0]
+    return None
+
+
+def chi_muove_per_primo(g):
+    fen = g['h'].get('FEN')
+    if fen and len(fen.split()) > 1:
+        return fen.split()[1]
+    return 'w'
+
+
+def chiave_fen(fen):
+    return ' '.join(fen.split()[:4])
+
+
+# ------------------------------------------------------------------ aperture (facoltative)
+def leggi_aperture(path):
+    """
+    Restituisce (mappa chiave -> id, mappa id -> metadati).
+    EPD: la chiave e' la FEN (4 campi); id dall'opcode id; metadati Pwin/DeltaWDL dal c0
+    scritto da genera_pgn.py. PGN: la chiave e' la sequenza di mosse della linea.
+    """
+    chiavi, meta = {}, {}
+    if path.lower().endswith('.epd'):
+        with open(path, encoding='utf-8') as f:
+            for n, riga in enumerate(f, 1):
+                riga = riga.strip()
+                if not riga:
+                    continue
+                campi = riga.split()
+                fen4 = ' '.join(campi[:4])
+                resto = ' '.join(campi[4:])
+                m = re.search(r'\bid\s+"([^"]+)"', resto)
+                ident = m.group(1) if m else f'pos{n:04d}'
+                md = {}
+                for k, v in re.findall(r'(Pwin|DeltaWDL)=([-\d.]+)', resto):
+                    md[k] = float(v)
+                chiavi[fen4] = ident
+                meta[ident] = md
+    else:
+        for n, g in enumerate(leggi_pgn(path), 1):
+            ident = g['h'].get('Event', f'linea{n:04d}')
+            if ident in meta:
+                ident = f'{ident}#{n}'
+            md = {}
+            for k in ('Pwin', 'DeltaWDL'):
+                if k in g['h']:
+                    try:
+                        md[k] = float(g['h'][k])
+                    except ValueError:
+                        pass
+            chiavi[tuple(g['mosse'])] = ident
+            meta[ident] = md
+    return chiavi, meta
+
+
+def chiave_apertura(g, mappa):
+    """Identificativo della posizione di partenza di una partita."""
+    if g['h'].get('FEN'):
+        k = chiave_fen(g['h']['FEN'])
+    else:
+        k = tuple(g['mosse'][:lunghezza_libro(g)])
+    if mappa is not None and k in mappa:
+        return mappa[k]
+    return k if isinstance(k, str) else ' '.join(k)
+
+
+# ------------------------------------------------------------------ statistica
+def elo(s):
+    s = min(max(s, 1e-9), 1 - 1e-9)
+    return -400.0 * math.log10(1.0 / s - 1.0)
+
+
+def elo_es(s, es):
+    return es * 400.0 / (math.log(10) * s * (1 - s))
+
+
+def trinomiale(punti):
+    n = len(punti)
+    s = sum(punti) / n
+    var = sum((x - s) ** 2 for x in punti) / n
+    es = math.sqrt(var / n)
+    z = (s - 0.5) / es if es > 0 else 0.0
+    return dict(partite=n, V=sum(x == 1 for x in punti), P=sum(x == .5 for x in punti),
+                S=sum(x == 0 for x in punti), punteggio=s, es=es, z=z,
+                p=2 * sps.norm.sf(abs(z)), elo=elo(s), elo_inf=elo(s - 1.96 * es), elo_sup=elo(s + 1.96 * es))
+
+
+def pentanomiale(coppie):
+    n = len(coppie)
+    per = [x / 2 for x in coppie]
+    s = sum(per) / n
+    var = sum((x - s) ** 2 for x in per) / n
+    es = math.sqrt(var / n)
+    z = (s - 0.5) / es if es > 0 else 0.0
+    f = collections.Counter(coppie)
+    return dict(coppie=n, conteggi=[f.get(k, 0) for k in (0, .5, 1, 1.5, 2)], punteggio=s, var_coppia=var,
+                es=es, z=z, p=2 * sps.norm.sf(abs(z)), elo=elo(s), elo_es=elo_es(s, es) if es > 0 else 0.0,
+                elo_inf=elo(s - 1.96 * es), elo_sup=elo(s + 1.96 * es),
+                t1=(s - 0.5) / math.sqrt(2 * var) if var > 0 else 0.0)
+
+
+def cluster(gruppi, B=10000):
+    medie = np.array([sum(c) / len(c) for c in gruppi])
+    k = len(medie)
+    if k < 3:
+        return None
+    s = medie.mean()
+    es = medie.std(ddof=1) / math.sqrt(k)
+    t = (s - 0.5) / es if es > 0 else 0.0
+    tc = sps.t.ppf(0.975, k - 1)
+    dev = [round(sum(c) - len(c) / 2, 6) for c in gruppi]
+    nz = [d for d in dev if d != 0]
+    pos = sum(d > 0 for d in nz)
+    somme = np.array([sum(c) for c in gruppi])
+    nn = np.array([len(c) for c in gruppi])
+    idx = RNG.integers(0, k, size=(B, k))
+    sb = np.clip(somme[idx].sum(1) / nn[idx].sum(1), 1e-9, 1 - 1e-9)
+    eb = -400 * np.log10(1 / sb - 1)
+    return dict(posizioni=k, punteggio=float(s), es=float(es), t=float(t), gl=k - 1,
+                p=float(2 * sps.t.sf(abs(t), k - 1)), elo=elo(s), elo_inf=elo(s - tc * es), elo_sup=elo(s + tc * es),
+                migliore_A=pos, migliore_B=len(nz) - pos, pari=k - len(nz),
+                p_segno=float(sps.binomtest(pos, len(nz), .5).pvalue) if nz else 1.0,
+                boot_inf=float(np.percentile(eb, 2.5)), boot_sup=float(np.percentile(eb, 97.5)))
+
+
+def coppie_necessarie(elo_effetto, var_coppia, alfa=0.05, potenza=0.80):
+    d = 1 / (1 + 10 ** (-elo_effetto / 400)) - 0.5
+    return math.ceil((sps.norm.ppf(1 - alfa / 2) + sps.norm.ppf(potenza)) ** 2 * var_coppia / d ** 2)
+
+
+def bradley_terry(partite, motori, ancora=None, valore=0.0):
+    ix = {e: i for i, e in enumerate(motori)}
+    m = len(motori)
+    n = np.zeros((m, m))
+    W = np.zeros(m)
+    for g in partite:
+        i, j = ix[g['w']], ix[g['b']]
+        s = g['sw']
+        n[i, j] += 1
+        n[j, i] += 1
+        W[i] += s
+        W[j] += 1 - s
+    gam = np.ones(m)
+    for _ in range(10000):
+        nuovo = np.array([W[i] / sum(n[i, j] / (gam[i] + gam[j]) for j in range(m) if j != i and n[i, j] > 0)
+                          if W[i] > 0 else 1e-6 for i in range(m)])
+        nuovo /= nuovo[ix[ancora]] if ancora in ix else np.exp(np.mean(np.log(nuovo)))
+        if np.max(np.abs(nuovo - gam)) < 1e-12:
+            gam = nuovo
+            break
+        gam = nuovo
+    r = 400 * np.log10(gam) + valore
+    return {e: float(r[ix[e]]) for e in motori}
+
+
+def ts(s):
+    return datetime.datetime.strptime(s.replace(' UTC', ''), '%Y-%m-%dT%H:%M:%S.%f')
+
+
+# ------------------------------------------------------------------ analisi
+def prepara(percorsi, mappa_aperture):
+    partite = []
+    for p in percorsi:
+        for g in leggi_pgn(p):
+            r = g['h'].get('Result')
+            if r not in ('1-0', '0-1', '1/2-1/2'):
+                continue
+            partite.append(dict(
+                w=g['h']['White'], b=g['h']['Black'], r=r,
+                sw={'1-0': 1.0, '0-1': 0.0, '1/2-1/2': 0.5}[r],
+                ap=chiave_apertura(g, mappa_aperture),
+                turno=g['h'].get('Round', ''), file=g['file'],
+                inizio=g['h'].get('GameStartTime'), fine=g['h'].get('GameEndTime'),
+                fe=prima_valutazione_bianco(g), g=g))
+    return partite
+
+
+def forma_coppie(partite):
+    """Coppie di partite fra gli stessi motori, sulla stessa posizione, a colori invertiti."""
+    gruppi = collections.defaultdict(list)
+    for x in partite:
+        gruppi[(frozenset((x['w'], x['b'])), x['ap'])].append(x)
+
+    def ordine(x):
+        t = x['turno']
+        return (x['file'], int(t) if t.isdigit() else 0, x['inizio'] or '')
+    coppie, spaiate = [], 0
+    for _, gs in gruppi.items():
+        gs = sorted(gs, key=ordine)
+        aperta = []
+        for x in gs:
+            compagna = next((y for y in aperta if y['w'] == x['b'] and y['b'] == x['w']), None)
+            if compagna:
+                aperta.remove(compagna)
+                coppie.append((compagna, x))
+            else:
+                aperta.append(x)
+        spaiate += len(aperta)
+    return coppie, spaiate
+
+
+def analizza_coppia(A, B, partite, coppie, favorita):
+    pAB = [x for x in partite if {x['w'], x['b']} == {A, B}]
+    if not pAB:
+        return None
+    punti = [x['sw'] if x['w'] == A else 1 - x['sw'] for x in pAB]
+    cp = [c for c in coppie if {c[0]['w'], c[0]['b']} == {A, B}]
+    punti_coppia = [sum(x['sw'] if x['w'] == A else 1 - x['sw'] for x in c) for c in cp]
+    per_ap = collections.defaultdict(list)
+    for x, s in zip(pAB, punti):
+        per_ap[x['ap']].append(s)
+    ris = dict(trinomiale=trinomiale(punti))
+    if punti_coppia:
+        ris['pentanomiale'] = pentanomiale(punti_coppia)
+    ris['cluster'] = cluster([per_ap[k] for k in sorted(per_ap)])
+    # McNemar sulla conversione della parte favorita, dentro ciascuna coppia
+    n10 = n01 = n11 = n00 = 0
+    for c in cp:
+        f = favorita.get(c[0]['ap'])
+        if f is None:
+            continue
+
+        def vince_favorita(x):
+            return (x['r'] == '1-0' and f == 1) or (x['r'] == '0-1' and f == -1)
+
+        def fav_motore(x):
+            return x['w'] if f == 1 else x['b']
+        a = [x for x in c if fav_motore(x) == A]
+        b = [x for x in c if fav_motore(x) == B]
+        if len(a) != 1 or len(b) != 1:
+            continue
+        ca, cb = vince_favorita(a[0]), vince_favorita(b[0])
+        n11 += ca and cb
+        n00 += (not ca) and (not cb)
+        n10 += ca and not cb
+        n01 += cb and not ca
+    ris['mcnemar'] = dict(entrambi=n11, nessuno=n00, solo_A=n10, solo_B=n01,
+                          p=float(sps.binomtest(n10, n10 + n01, .5).pvalue) if n10 + n01 else 1.0)
+    ris['posizioni'] = len(per_ap)
+    ris['partite_per_posizione'] = dict(collections.Counter(len(v) for v in per_ap.values()))
+    return ris
+
+
+def regressione_delta(A, B, partite, meta):
+    """Punteggio medio di A per posizione in funzione di Delta WDL e di |Pwin - bersaglio| (OLS pesata)."""
+    per_ap = collections.defaultdict(list)
+    for x in partite:
+        if {x['w'], x['b']} == {A, B}:
+            per_ap[x['ap']].append(x['sw'] if x['w'] == A else 1 - x['sw'])
+    righe = [(np.mean(v), len(v), meta[k]['DeltaWDL'], abs(meta[k]['Pwin'] - (0.75 if meta[k]['Pwin'] >= 0.5 else 0.25)))
+             for k, v in per_ap.items() if k in meta and 'DeltaWDL' in meta[k] and 'Pwin' in meta[k]]
+    if len(righe) < 10:
+        return None
+    y = np.array([r[0] for r in righe])
+    w = np.array([r[1] for r in righe], float)
+    X = np.column_stack([np.ones(len(righe)), [r[2] for r in righe], [r[3] for r in righe]])
+    Wm = np.diag(w)
+    XtWX = X.T @ Wm @ X
+    beta = np.linalg.solve(XtWX, X.T @ Wm @ y)
+    res = y - X @ beta
+    # errori standard robusti (sandwich HC1) per i pesi = numero di partite
+    meat = X.T @ np.diag((w * res) ** 2) @ X
+    cov = np.linalg.inv(XtWX) @ meat @ np.linalg.inv(XtWX) * len(y) / (len(y) - 3)
+    es = np.sqrt(np.diag(cov))
+    nomi = ['costante', 'DeltaWDL', 'distanza_Pwin']
+    return {nomi[i]: dict(coeff=float(beta[i]), es=float(es[i]),
+                          p=float(2 * sps.norm.sf(abs(beta[i] / es[i]))) if es[i] > 0 else None) for i in range(3)} | {'posizioni': len(righe)}
+
+
+def analizza(percorsi, args, mappa, meta, etichetta):
+    partite = prepara(percorsi, mappa)
+    if not partite:
+        sys.exit(f'[ERRORE] Nessuna partita valida in {percorsi}')
+    motori = sorted({x['w'] for x in partite} | {x['b'] for x in partite})
+    coppie, spaiate = forma_coppie(partite)
+    R = dict(etichetta=etichetta, file=percorsi, partite=len(partite), motori=motori,
+             coppie=len(coppie), partite_spaiate=spaiate)
+
+    # parte favorita di ciascuna posizione: segno della prima valutazione media (punto di vista del Bianco)
+    fe = collections.defaultdict(list)
+    for x in partite:
+        if x['fe'] is not None:
+            fe[x['ap']].append(x['fe'])
+    favorita = {k: (1 if st.mean(v) > 0 else -1) for k, v in fe.items() if v and st.mean(v) != 0}
+
+    # classifica e tabella incrociata
+    tab = {}
+    for e in motori:
+        pts = [x['sw'] if x['w'] == e else 1 - x['sw'] for x in partite if e in (x['w'], x['b'])]
+        tab[e] = dict(partite=len(pts), V=sum(p == 1 for p in pts), P=sum(p == .5 for p in pts),
+                      S=sum(p == 0 for p in pts), punti=sum(pts))
+    R['classifica'] = tab
+
+    # verifica del disegno: tutte le coppie di motori devono avere giocato le stesse posizioni
+    copertura = {}
+    insiemi = {}
+    for i, a in enumerate(motori):
+        for b in motori[i + 1:]:
+            c = collections.Counter(x['ap'] for x in partite if {x['w'], x['b']} == {a, b})
+            if c:
+                copertura[f'{a} - {b}'] = dict(posizioni=len(c), partite=sum(c.values()),
+                                               partite_per_posizione=dict(collections.Counter(c.values())))
+                insiemi[(a, b)] = set(c)
+    tutte = set(x['ap'] for x in partite)
+    R['copertura'] = copertura
+    R['disegno_incrociato'] = all(s == tutte for s in insiemi.values()) and len(insiemi) == len(motori) * (len(motori) - 1) // 2
+    R['posizioni'] = len(tutte)
+
+    # coppie di motori
+    R['accoppiamenti'] = {}
+    for i, a in enumerate(motori):
+        for b in motori[i + 1:]:
+            r = analizza_coppia(a, b, partite, coppie, favorita)
+            if r:
+                R['accoppiamenti'][f'{a} vs {b}'] = r
+
+    # Bradley-Terry con bootstrap sulle posizioni
+    if len(motori) >= 2:
+        ancora = args.ancora if args.ancora in motori else motori[0]
+        R['bt'] = bradley_terry(partite, motori, ancora, args.elo_ancora)
+        per_ap = collections.defaultdict(list)
+        for x in partite:
+            per_ap[x['ap']].append(x)
+        chiavi = sorted(per_ap)
+        boot = {e: [] for e in motori}
+        for _ in range(args.bootstrap):
+            camp = [x for k in RNG.choice(len(chiavi), size=len(chiavi)) for x in per_ap[chiavi[k]]]
+            if len({x['w'] for x in camp} | {x['b'] for x in camp}) < len(motori):
+                continue
+            r = bradley_terry(camp, motori, ancora, args.elo_ancora)
+            for e in motori:
+                boot[e].append(r[e])
+        R['bt_ic'] = {e: [float(np.percentile(v, 2.5)), float(np.percentile(v, 97.5))] for e, v in boot.items() if v}
+        R['bt_ancora'] = [ancora, args.elo_ancora]
+
+    # proprieta' delle posizioni
+    vf = sum(1 for x in partite if x['ap'] in favorita and ((x['r'] == '1-0' and favorita[x['ap']] == 1) or (x['r'] == '0-1' and favorita[x['ap']] == -1)))
+    vs = sum(1 for x in partite if x['ap'] in favorita and ((x['r'] == '1-0' and favorita[x['ap']] == -1) or (x['r'] == '0-1' and favorita[x['ap']] == 1)))
+    R['parte_favorita'] = dict(vittorie_favorita=vf, vittorie_sfavorita=vs,
+                               patte=sum(x['r'] == '1/2-1/2' for x in partite),
+                               posizioni_favorito_bianco=sum(v == 1 for v in favorita.values()),
+                               posizioni_favorito_nero=sum(v == -1 for v in favorita.values()))
+    dec = collections.Counter()
+    tot = collections.Counter()
+    for x in partite:
+        tot[x['ap']] += 1
+        dec[x['ap']] += x['r'] != '1/2-1/2'
+    R['decisive'] = dict(totale=sum(dec.values()), quota=sum(dec.values()) / len(partite),
+                         posizioni_tutte_patte=sum(1 for k in tot if dec[k] == 0),
+                         posizioni_tutte_decisive=sum(1 for k in tot if dec[k] == tot[k]))
+    medie_fe = {k: st.mean(v) for k, v in fe.items() if v}
+    fasce = [(0, .8), (.8, .9), (.9, 1.0), (1.0, 1.1), (1.1, 1.2), (1.2, 99)]
+    R['decisive_per_fascia_eval'] = []
+    for lo, hi in fasce:
+        ks = [k for k in tot if k in medie_fe and lo <= abs(medie_fe[k]) < hi]
+        n = sum(tot[k] for k in ks)
+        R['decisive_per_fascia_eval'].append(dict(fascia=f'{lo}-{hi}', posizioni=len(ks), partite=n,
+                                                  quota=(sum(dec[k] for k in ks) / n) if n else None))
+    # condizioni di esecuzione
+    try:
+        ev = sorted([(ts(x['inizio']), 1) for x in partite if x['inizio']] + [(ts(x['fine']), -1) for x in partite if x['fine']])
+        cur = mx = 0
+        for _, d in ev:
+            cur += d
+            mx = max(mx, cur)
+        R['esecuzione'] = dict(inizio=str(ev[0][0]), fine=str(ev[-1][0]),
+                               ore=(ev[-1][0] - ev[0][0]).total_seconds() / 3600, max_partite_simultanee=mx,
+                               durata_media_min=st.mean((ts(x['fine']) - ts(x['inizio'])).total_seconds() / 60
+                                                        for x in partite if x['inizio'] and x['fine']))
+    except (ValueError, IndexError, TypeError):
+        R['esecuzione'] = None
+    term = collections.Counter()
+    for x in partite:
+        ult = x['g']['com'][-1] if x['g']['com'] else ''
+        term[ult.split(',')[-1].strip() or x['g']['h'].get('Termination', '')] += 1
+    R['terminazioni'] = dict(term)
+    prof = collections.defaultdict(list)
+    for x in partite:
+        g = x['g']
+        pari = chi_muove_per_primo(g) == 'w'
+        for k in range(lunghezza_libro(g), len(g['mosse'])):
+            e = valuta(g['com'][k])
+            if e:
+                bianco = (k % 2 == 0) == pari
+                prof[g['h']['White'] if bianco else g['h']['Black']].append(e[1])
+    R['profondita_mediana'] = {e: st.median(v) for e, v in prof.items()}
+
+    # coppia di interesse: potenza e regressione su Delta WDL
+    if args.a and args.b:
+        chiave = f'{args.a} vs {args.b}' if f'{args.a} vs {args.b}' in R['accoppiamenti'] else f'{args.b} vs {args.a}'
+        if chiave in R['accoppiamenti']:
+            pen = R['accoppiamenti'][chiave].get('pentanomiale')
+            if pen and pen['var_coppia'] > 0:
+                R['potenza'] = {str(e): coppie_necessarie(e, pen['var_coppia']) for e in (5, 10, 15, 20, 30)}
+            if meta:
+                R['regressione_delta'] = regressione_delta(args.a, args.b, partite, meta)
+    return R
+
+
+def fp(p):
+    """p-value leggibile."""
+    return '< 0.001' if p < 0.001 else f'{p:.3f}'
+
+
+def riga_md(*celle):
+    return '| ' + ' | '.join(str(c) for c in celle) + ' |'
+
+
+def markdown(R, conf=None):
+    L = [f"# {R['etichetta']}", '', f"Partite: {R['partite']} · posizioni: {R['posizioni']} · coppie a colori invertiti: {R['coppie']} (partite non appaiate: {R['partite_spaiate']})", '']
+    L.append('Disegno incrociato (ogni coppia di motori sulle stesse posizioni): ' + ('SI' if R['disegno_incrociato'] else '**NO**'))
+    L += ['', '## Classifica', '', riga_md('Motore', 'Partite', 'V-P-S', 'Punti', 'Rating BT', 'IC 95%'), riga_md(*['---'] * 6)]
+    for e, t in sorted(R['classifica'].items(), key=lambda kv: -kv[1]['punti']):
+        bt = R.get('bt', {}).get(e)
+        ic = R.get('bt_ic', {}).get(e)
+        L.append(riga_md(e, t['partite'], f"{t['V']}-{t['P']}-{t['S']}", t['punti'],
+                         f'{bt:.1f}' if bt is not None else '', f'[{ic[0]:.1f}; {ic[1]:.1f}]' if ic else ''))
+    L += ['', '## Accoppiamenti (modello pentanomiale)', '',
+          riga_md('A vs B', 'V-P-S di A', 'Punteggio A', 'Coppie 0/½/1/1½/2', 'Elo A-B [IC 95%]', 'p', 'p cluster', 'McNemar p'),
+          riga_md(*['---'] * 8)]
+    for k, r in R['accoppiamenti'].items():
+        t, p, c = r['trinomiale'], r.get('pentanomiale'), r.get('cluster')
+        L.append(riga_md(k, f"{t['V']}-{t['P']}-{t['S']}", f"{100 * t['punteggio']:.1f}%",
+                         '/'.join(map(str, p['conteggi'])) if p else '',
+                         f"{p['elo']:+.1f} [{p['elo_inf']:+.1f}; {p['elo_sup']:+.1f}]" if p else '',
+                         fp(p['p']) if p else '', fp(c['p']) if c else '', fp(r['mcnemar']['p'])))
+    pf = R['parte_favorita']
+    L += ['', '## Posizioni', '',
+          f"Partite decisive: {R['decisive']['totale']} ({100 * R['decisive']['quota']:.1f}%). Vittorie della parte favorita: {pf['vittorie_favorita']}; della parte sfavorita: {pf['vittorie_sfavorita']}; patte: {pf['patte']}.",
+          f"Posizioni sempre patte: {R['decisive']['posizioni_tutte_patte']}; sempre decisive: {R['decisive']['posizioni_tutte_decisive']}.", '']
+    if R.get('potenza'):
+        L += ['## Potenza (80%, alfa 0,05)', '', ', '.join(f'{k} Elo: {v} coppie' for k, v in R['potenza'].items()), '']
+    if conf:
+        L += ['## Interazione', '', f"Differenza Elo ({conf['coppia']}) fra '{conf['etichetta_1']}' e '{conf['etichetta_2']}': {conf['differenza']:+.1f} Elo, ES {conf['es']:.1f}, z = {conf['z']:.2f}, p = {fp(conf['p'])}", '']
+    if R.get('esecuzione'):
+        e = R['esecuzione']
+        L += ['## Esecuzione', '', f"Dal {e['inizio']} al {e['fine']} ({e['ore']:.1f} h); massimo {e['max_partite_simultanee']} partite simultanee; durata media {e['durata_media_min']:.1f} min.", '']
+    return '\n'.join(L)
+
+
+def main():
+    ap = argparse.ArgumentParser(description='Statistiche di match e tornei cutechess sulle pepite')
+    ap.add_argument('--pgn', nargs='+', required=True, help='uno o piu file PGN prodotti da cutechess-cli')
+    ap.add_argument('--aperture', help='file delle posizioni di partenza (.epd di genera_pgn.py oppure .pgn di linee)')
+    ap.add_argument('--a', help='primo motore della coppia di interesse (nome come nel PGN)')
+    ap.add_argument('--b', help='secondo motore della coppia di interesse')
+    ap.add_argument('--ancora', help='motore di riferimento per i rating (nome come nel PGN)')
+    ap.add_argument('--elo-ancora', type=float, default=0.0, help='rating assegnato al motore di riferimento (default 0)')
+    ap.add_argument('--confronta', nargs='+', help='PGN di un secondo insieme di posizioni (es. controllo) per il test d interazione')
+    ap.add_argument('--bootstrap', type=int, default=2000, help='repliche bootstrap (default 2000)')
+    ap.add_argument('--etichetta', default='Esperimento', help='titolo del rapporto')
+    ap.add_argument('--out', default='statistiche', help='prefisso dei file di output (.json e .md)')
+    args = ap.parse_args()
+
+    mappa, meta = (None, {})
+    if args.aperture:
+        mappa, meta = leggi_aperture(args.aperture)
+    R = analizza(args.pgn, args, mappa, meta, args.etichetta)
+    if args.a and args.b:
+        for n in (args.a, args.b):
+            if n not in R['motori']:
+                sys.exit(f"[ERRORE] Motore '{n}' non trovato. Motori nel PGN: {R['motori']}")
+
+    conf = None
+    if args.confronta:
+        if not (args.a and args.b):
+            sys.exit('[ERRORE] --confronta richiede --a e --b')
+        R2 = analizza(args.confronta, args, None, {}, 'confronto')
+        k1 = next(k for k in R['accoppiamenti'] if set(k.split(' vs ')) == {args.a, args.b})
+        k2 = next(k for k in R2['accoppiamenti'] if set(k.split(' vs ')) == {args.a, args.b})
+        p1, p2 = R['accoppiamenti'][k1]['pentanomiale'], R2['accoppiamenti'][k2]['pentanomiale']
+        segno1 = 1 if k1.startswith(args.a) else -1
+        segno2 = 1 if k2.startswith(args.a) else -1
+        d = segno1 * p1['elo'] - segno2 * p2['elo']
+        es = math.hypot(p1['elo_es'], p2['elo_es'])
+        z = d / es
+        conf = dict(coppia=f'{args.a} - {args.b}', etichetta_1=args.etichetta, etichetta_2='confronto',
+                    elo_1=segno1 * p1['elo'], elo_2=segno2 * p2['elo'], differenza=d, es=es, z=z,
+                    p=float(2 * sps.norm.sf(abs(z))))
+        R['confronto'] = dict(risultati=R2, interazione=conf)
+
+    with open(args.out + '.json', 'w', encoding='utf-8') as f:
+        json.dump(R, f, indent=1, ensure_ascii=False, default=float)
+    with open(args.out + '.md', 'w', encoding='utf-8') as f:
+        f.write(markdown(R, conf))
+    print(markdown(R, conf))
+    print(f'\n[OK] Scritti {args.out}.json e {args.out}.md')
+
+
+if __name__ == '__main__':
+    main()
+
+
+////////////////////////////////////////////////////////////////////////////////
 /// PERCORSO: src\engine_worker.py
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -593,79 +1750,179 @@ import chess
 import chess.engine
 from state_manager import StateManager
 import qualimetria
+from qualimetria import GamePhase
+from registro import classifica, frazioni_wdl, wdl_da_riga
 
-async def run_worker(worker_id: int, queue: asyncio.Queue, state: StateManager, config: dict):
-    """
-    Worker asincrono: gestisce un'istanza di Stockfish/ShashChess.
-    Preleva posizioni dalla coda, controlla la cache e, se necessario, analizza.
-    """
-    engine_path = config["engine_path"]
-    analysis_time = config["analysis_time"]
-    wdl_tolerance = config["wdl_tolerance"]
-    # Quota massima ammessa per il terzo esito: L per le pepite a 0.75, W per quelle a 0.25.
-    # 0.0 = definizione stretta (Pwin=75% con L=0, oppure Pwin=25% con W=0).
-    opposite_max = config.get("opposite_max", 0.0)
-    
-    # Calcolo dei target dinamici in base alla tolleranza specificata (es. 0.03 = 3%)
-    target_high_min = 0.75 - wdl_tolerance
-    target_high_max = 0.75 + wdl_tolerance
-    target_low_min = 0.25 - wdl_tolerance
-    target_low_max = 0.25 + wdl_tolerance
 
-    try:
-        # Avvia il processo del motore in background (comunicazione via pipe stdin/stdout)
-        transport, engine = await chess.engine.popen_uci(engine_path)
-        
-        # Configurazione opzioni UCI
-        engine_options = {
-            "Threads": config.get("threads", 1),
-            "Hash": config.get("hash", 64),
-            "UCI_ShowWDL": True
+def _limite(config: dict) -> chess.engine.Limit:
+    """Limite di analisi: a nodi se 'analysis_nodes' e' impostato (consigliato per Lc0), altrimenti a tempo."""
+    nodi = config.get("analysis_nodes")
+    if nodi:
+        return chess.engine.Limit(nodes=int(nodi))
+    return chess.engine.Limit(time=config["analysis_time"])
+
+
+async def _avvia_motore(worker_id: int, config: dict):
+    """
+    Avvia e configura il motore. Le opzioni non dichiarate dal motore vengono saltate con un
+    avviso, cosi' lo stesso codice funziona con Stockfish, ShashChess e Lc0 (che non ha 'Hash').
+    """
+    transport, engine = await chess.engine.popen_uci(config["engine_path"])
+    desiderate = {
+        "Threads": config.get("threads", 1),
+        "Hash": config.get("hash", 64),
+        "UCI_ShowWDL": True,
+    }
+    if config.get("syzygy_path"):
+        desiderate["SyzygyPath"] = config["syzygy_path"]
+    # Opzioni aggiuntive o specifiche del motore (es. WeightsFile, Backend per Lc0)
+    desiderate.update(config.get("engine_options", {}))
+
+    engine_options = {}
+    for nome, valore in desiderate.items():
+        if nome in engine.options:
+            engine_options[nome] = valore
+        elif worker_id == 0:
+            print(f"[WORKER {worker_id}] Opzione '{nome}' non supportata dal motore: ignorata.")
+    await engine.configure(engine_options)
+    nome_motore = engine.id.get("name", str(config["engine_path"]))
+    return engine, engine_options, nome_motore
+
+
+def _cp(score_white) -> str:
+    """Valutazione dal punto di vista del Bianco: centipawn, oppure 'M<n>' per il matto."""
+    if score_white.is_mate():
+        return f"M{score_white.mate()}"
+    return str(score_white.score())
+
+
+async def _ripristina(state: StateManager, fen: str, riga: dict, variant_pgn: str, criteri: dict):
+    """
+    Ripresa dopo un'interruzione: la posizione era gia' nel registro. Si riapplicano
+    le soglie correnti ai valori W/D/L salvati, senza rianalizzare.
+    """
+    wdl = wdl_da_riga(riga)
+    esito = classifica(wdl[0], wdl[1], **criteri) if wdl else None
+    if esito and esito["pepita"] and not str(riga.get("CP1", "")).startswith("M"):
+        metrics = {
+            "win_probability": round(esito["pwin1"], 3),
+            "delta_win_probability": round(esito["delta"], 3),
+            "wdl_1": tuple(round(x, 3) for x in wdl[0]),
+            "wdl_2": tuple(round(x, 3) for x in wdl[1]),
+            "fase": GamePhase(riga["Fase"]) if riga.get("Fase") else None,
+            "centro": riga.get("Centro"),
+            "tensione": int(float(riga["Tensione"])) if riga.get("Tensione") else None,
+            "material_imbalance": float(riga["Imbalance"]) if riga.get("Imbalance") else None,
         }
-        if config.get("syzygy_path"):
-            engine_options["SyzygyPath"] = config["syzygy_path"]
-            
-        await engine.configure(engine_options)
-        print(f"[WORKER {worker_id}] Motore UCI avviato e configurato.")
-        
+        await state.update_to_nugget(fen, metrics, riga.get("Variante_PGN") or variant_pgn)
+    else:
+        await state.update_to_not_nugget(fen)
+
+
+async def run_worker(worker_id: int, queue: asyncio.Queue, state: StateManager, config: dict, registro=None):
+    """
+    Worker asincrono: gestisce un'istanza di Stockfish/ShashChess (o Lc0).
+    Preleva posizioni dalla coda, controlla la cache e, se necessario, analizza.
+    Ogni posizione analizzata, pepita o no, viene scritta subito nel registro (se attivo).
+    """
+    wdl_tolerance = config["wdl_tolerance"]
+    criteri = {
+        "wdl_tolerance": wdl_tolerance,
+        # Soglia del Delta WDL: se assente coincide con la tolleranza su Pwin (comportamento originale)
+        "delta_max": config.get("delta_max", wdl_tolerance),
+        # Quota massima ammessa per il terzo esito: L per le pepite a 0.75, W per quelle a 0.25.
+        # 0.0 = definizione stretta (Pwin=75% con L=0, oppure Pwin=25% con W=0).
+        "opposite_max": config.get("opposite_max", 0.0),
+    }
+    limite = _limite(config)
+    # Con True ogni posizione e' analizzata a tabella hash vuota (ucinewgame): analisi indipendenti
+    nuova_partita = config.get("nuova_partita_per_posizione", True)
+
+    engine = None
+    try:
+        engine, engine_options, nome_motore = await _avvia_motore(worker_id, config)
+        print(f"[WORKER {worker_id}] Motore UCI avviato e configurato ({nome_motore}).")
+
         while True:
             # Preleva un task (o si sospende se la coda è vuota)
             task = await queue.get()
-            
+
             # Segnale di terminazione (veleno) per fermare il worker
             if task is None:
                 queue.task_done()
                 break
-                
+
             # Avvolgiamo tutta la logica di analisi in un blocco try-finally
             # per garantire che task_done() venga chiamato una e una sola volta.
             try:
                 board, current_date, variant_pgn = task
                 fen = board.fen()
-                
+
                 # 1. VERIFICA CACHE (Operazione O(1) in RAM, non blocca l'engine)
                 status = await state.register_fen(fen, current_date)
                 if status is not None:
                     # HIT: La FEN era già nota. I contatori (frequenza/data) sono già stati aggiornati.
                     continue
-                    
+
+                # 1b. RIPRESA: posizione analizzata in un'esecuzione precedente (registro su disco)
+                if registro is not None:
+                    salvata = registro.gia_analizzata(fen)
+                    if salvata is not None:
+                        await _ripristina(state, fen, salvata, variant_pgn, criteri)
+                        continue
+
+                riga = {
+                    "FEN": fen,
+                    "Tratto": "w" if board.turn == chess.WHITE else "b",
+                    "Semimossa": board.ply(),
+                    "Data": current_date,
+                    "Variante_PGN": variant_pgn,
+                    "Motore": nome_motore,
+                }
+
                 # 2. MISS: Posizione nuova. Eseguiamo l'Analisi in MultiPV=2
                 try:
                     info = await engine.analyse(
-                        board, 
-                        chess.engine.Limit(time=analysis_time),
+                        board,
+                        limite,
                         multipv=2,
+                        game=(fen if nuova_partita else None),
                         options=engine_options
                     )
-                    
+
+                    # Qualimetria calcolata per tutte le posizioni (costo trascurabile):
+                    # serve per i tassi di riferimento delle strutture e delle fasi.
+                    fase = qualimetria.get_game_phase(board)
+                    centro = qualimetria.analyze_center_type(board)
+                    tensione = qualimetria.get_tension(board)
+                    imbalance = qualimetria.get_material_imbalance(board)
+                    riga.update({"Fase": fase.value, "Centro": centro, "Tensione": tensione, "Imbalance": imbalance})
+
                     # Se il motore non trova almeno 2 mosse (es. c'è una sola mossa legale), scartiamo
                     if len(info) < 2:
+                        riga["Stato"] = "Scartata"
                         await state.update_to_not_nugget(fen)
                         continue
-                        
+
+                    # Dati di ricerca delle due linee (per la Tabella 2 e lo studio del rumore)
+                    pv1, pv2 = info[0].get("pv") or [], info[1].get("pv") or []
+                    riga.update({
+                        "CP1": _cp(info[0]["score"].white()),
+                        "CP2": _cp(info[1]["score"].white()),
+                        "Mossa1": board.san(pv1[0]) if pv1 else "",
+                        "Mossa2": board.san(pv2[0]) if pv2 else "",
+                        "Profondita1": info[0].get("depth", ""),
+                        "Profondita2": info[1].get("depth", ""),
+                        "SelDepth": info[0].get("seldepth", ""),
+                        "Nodi": info[0].get("nodes", ""),
+                        "NPS": info[0].get("nps", ""),
+                        "Tempo": info[0].get("time", ""),
+                        "TBHits": info[0].get("tbhits", ""),
+                    })
+
                     # Controlliamo subito se la posizione termina con un matto forzato
-                    score = info[0]["score"].white()
-                    if score.is_mate():
+                    if info[0]["score"].white().is_mate():
+                        riga["Stato"] = "Non nugget"
                         await state.update_to_not_nugget(fen)
                         continue
 
@@ -674,38 +1931,21 @@ async def run_worker(worker_id: int, queue: asyncio.Queue, state: StateManager, 
                         # Terne (W, D, L) delle due linee, dal punto di vista del Bianco, come frazioni
                         wdl_1 = info[0]["wdl"].white()
                         wdl_2 = info[1]["wdl"].white()
-                        tot_1 = wdl_1.wins + wdl_1.draws + wdl_1.losses
-                        tot_2 = wdl_2.wins + wdl_2.draws + wdl_2.losses
-                        w1, d1, l1 = wdl_1.wins / tot_1, wdl_1.draws / tot_1, wdl_1.losses / tot_1
-                        w2, d2, l2 = wdl_2.wins / tot_2, wdl_2.draws / tot_2, wdl_2.losses / tot_2
+                        w1, d1, l1 = frazioni_wdl(wdl_1.wins, wdl_1.draws, wdl_1.losses)
+                        w2, d2, l2 = frazioni_wdl(wdl_2.wins, wdl_2.draws, wdl_2.losses)
+                        esito = classifica((w1, d1, l1), (w2, d2, l2), **criteri)
+                        riga.update({
+                            "W1": round(w1, 3), "D1": round(d1, 3), "L1": round(l1, 3),
+                            "W2": round(w2, 3), "D2": round(d2, 3), "L2": round(l2, 3),
+                            "Pwin1": round(esito["pwin1"], 4), "Pwin2": round(esito["pwin2"], 4),
+                            "Delta": round(esito["delta"], 4),
+                        })
 
-                        # Win probability = W + D/2
-                        win_prob_1 = wdl_1.expectation()
-                        win_prob_2 = wdl_2.expectation()
-
-                        # Calcolo del Delta Win Probability
-                        delta_win_prob = abs(win_prob_1 - win_prob_2)
-
-                        # Pepita "bianca": Pwin ~ 0.75 e L ~ 0 (quindi W = D).
-                        # Pepita "nera":   Pwin ~ 0.25 e W ~ 0 (quindi D = L).
-                        is_white_nugget = (target_high_min <= win_prob_1 <= target_high_max
-                                           and l1 <= opposite_max)
-                        is_black_nugget = (target_low_min <= win_prob_1 <= target_low_max
-                                           and w1 <= opposite_max)
-
-                        # Il Delta non deve superare la tolleranza!
-                        is_delta_valid = delta_win_prob <= wdl_tolerance
-
-                        if (is_white_nugget or is_black_nugget) and is_delta_valid:
-                            # 3. È UNA PEPITA! Estraiamo le altre metriche per il salvataggio
-                            fase = qualimetria.get_game_phase(board)
-                            centro = qualimetria.analyze_center_type(board)
-                            tensione = qualimetria.get_tension(board)
-                            imbalance = qualimetria.get_material_imbalance(board)
-                            
+                        if esito["pepita"]:
+                            # 3. È UNA PEPITA! Salviamo le metriche
                             metrics = {
-                                "win_probability": round(win_prob_1, 3),
-                                "delta_win_probability": round(delta_win_prob, 3),
+                                "win_probability": round(esito["pwin1"], 3),
+                                "delta_win_probability": round(esito["delta"], 3),
                                 "wdl_1": (round(w1, 3), round(d1, 3), round(l1, 3)),
                                 "wdl_2": (round(w2, 3), round(d2, 3), round(l2, 3)),
                                 "fase": fase,
@@ -713,34 +1953,56 @@ async def run_worker(worker_id: int, queue: asyncio.Queue, state: StateManager, 
                                 "tensione": tensione,
                                 "material_imbalance": imbalance
                             }
-                            
+
                             # 3.3 Salvataggio Globale
                             await state.update_to_nugget(fen, metrics, variant_pgn)
-                            print(f"[WORKER {worker_id}] ✨ PEPITA TROVATA! WDL1: {win_prob_1:.3f} | Delta WDL: {delta_win_prob:.3f}")
+                            riga["Stato"] = "Nugget"
+                            print(f"[WORKER {worker_id}] ✨ PEPITA TROVATA! WDL1: {esito['pwin1']:.3f} | Delta WDL: {esito['delta']:.3f}")
                         else:
                             # Scartata dai filtri WDL
+                            riga["Stato"] = "Non nugget"
                             await state.update_to_not_nugget(fen)
                     else:
                         # Niente output WDL (caso anomalo)
+                        riga["Stato"] = "Non nugget"
                         await state.update_to_not_nugget(fen)
 
                 except chess.engine.EngineTerminatedError:
-                    print(f"[WORKER {worker_id}] ⚠️ Crash del motore (EngineTerminatedError).")
+                    # Il motore e' morto: lo riavviamo, altrimenti tutte le posizioni successive
+                    # di questo worker verrebbero scartate. La posizione resta "Errore" e alla
+                    # prossima esecuzione verra' rianalizzata.
+                    print(f"[WORKER {worker_id}] ⚠️ Crash del motore (EngineTerminatedError): riavvio.")
+                    riga["Stato"] = "Errore"
                     await state.update_to_not_nugget(fen)
-                    
+                    try:
+                        engine, engine_options, nome_motore = await _avvia_motore(worker_id, config)
+                    except Exception as e:
+                        print(f"[WORKER {worker_id}] ⚠️ Riavvio del motore fallito: {e}")
+                        raise
+
                 except Exception as e:
                     print(f"[WORKER {worker_id}] ⚠️ Errore generico durante l'analisi: {e}")
+                    riga["Stato"] = "Errore"
                     await state.update_to_not_nugget(fen)
-                    
+
+                finally:
+                    if registro is not None and "Stato" in riga:
+                        registro.scrivi(riga)
+
             finally:
                 # Segnala alla coda che questo specifico task è concluso.
                 # Chiamato esattamente una volta per ogni elemento scaricato dalla coda.
                 queue.task_done()
-                
+
     finally:
         # Quando il while loop si rompe (segnale None), chiudiamo il motore pulitamente
-        await engine.quit()
+        if engine is not None:
+            try:
+                await engine.quit()
+            except Exception:
+                pass
         print(f"[WORKER {worker_id}] Spegnimento completato.")
+
 
 ////////////////////////////////////////////////////////////////////////////////
 /// PERCORSO: src\exporter.py
@@ -911,14 +2173,17 @@ def export_html_summary(nuggets: List[NuggetRecord], filepath: str):
 /// PERCORSO: src\main.py
 ////////////////////////////////////////////////////////////////////////////////
 
+import argparse
 import asyncio
 import json
 import os
 import sys
 import time
+from datetime import datetime
 from state_manager import StateManager
-from pgn_producer import produce_tasks
+from pgn_producer import produce_tasks, count_positions
 from engine_worker import run_worker
+from registro import Registro
 import exporter
 
 def load_config(config_path="config.json") -> dict:
@@ -929,69 +2194,119 @@ def load_config(config_path="config.json") -> dict:
     with open(config_path, "r") as f:
         return json.load(f)
 
+def get_args():
+    p = argparse.ArgumentParser(description="NuggetsManagement - Miner di Pepite WDL")
+    p.add_argument("--config", default="config.json", help="file di configurazione (default: config.json)")
+    p.add_argument("--conta", action="store_true",
+                   help="conta soltanto le posizioni da analizzare e stima la durata, senza avviare i motori")
+    p.add_argument("--output-dir", default=None,
+                   help="cartella di output (sostituisce output_dir del config; utile per le analisi ripetute)")
+    return p.parse_args()
+
 async def main():
+    args = get_args()
     print("==================================================")
     print("   NuggetsManagement - Miner di Pepite WDL        ")
     print("==================================================")
-    
+
     # 1. Caricamento configurazioni e setup cartelle
-    config = load_config()
+    config = load_config(args.config)
+    if args.output_dir:
+        config["output_dir"] = args.output_dir
+    solo_finale = config.get("solo_posizione_finale", False)
+    concurrency = config.get("concurrency", 4)
+
+    if args.conta:
+        totale, distinte = count_positions(config["pgn_path"], solo_finale)
+        print(f"[*] Posizioni lette: {totale}; FEN distinte da analizzare: {distinte}")
+        if config.get("analysis_nodes"):
+            print(f"[*] Limite a nodi ({config['analysis_nodes']}): misurare i nodi al secondo per stimare la durata.")
+        else:
+            ore = distinte * config["analysis_time"] / concurrency / 3600
+            print(f"[*] Stima: {distinte} x {config['analysis_time']} s / {concurrency} istanze = {ore:.1f} ore")
+        return
+
     os.makedirs(config["output_dir"], exist_ok=True)
-    
+
+    # Registro incrementale di tutte le posizioni (ripresa automatica dopo un'interruzione)
+    registro = None
+    if config.get("registro", True):
+        registro_path = os.path.join(config["output_dir"], config.get("registro_csv", "tutte_le_posizioni.csv"))
+        registro = Registro(registro_path)
+        print(f"[*] Registro: {registro_path} ({len(registro)} posizioni gia' analizzate"
+              + (f", {registro.righe_scartate} righe incomplete ignorate" if registro.righe_scartate else "") + ")")
+
+    # Metadati dell'esecuzione: servono per la Tabella 2 del paper
+    meta_path = os.path.join(config["output_dir"], "metadati_esecuzione.json")
+    meta = {"avvio": datetime.now().isoformat(timespec="seconds"), "config": config,
+            "host": os.uname().nodename if hasattr(os, "uname") else ""}
+
     # 2. Inizializzazione Stato e Coda
     state = StateManager()
-    # Una coda di 1000 elementi è perfetta. Evita che il Producer legga 
+    # Una coda di 1000 elementi è perfetta. Evita che il Producer legga
     # milioni di posizioni riempiendo la RAM prima che i Worker le analizzino.
-    queue = asyncio.Queue(maxsize=1000) 
-    
-    concurrency = config.get("concurrency", 4)
-    print(f"[*] Concorrenza: {concurrency} motori paralleli.")
-    print(f"[*] Tempo per analisi: {config['analysis_time']} sec.")
-    
+    queue = asyncio.Queue(maxsize=1000)
+
+    print(f"[*] Concorrenza: {concurrency} motori paralleli x {config.get('threads', 1)} thread.")
+    if config.get("analysis_nodes"):
+        print(f"[*] Limite per analisi: {config['analysis_nodes']} nodi.")
+    else:
+        print(f"[*] Tempo per analisi: {config['analysis_time']} sec.")
+
     start_time = time.time()
-    
+
     # 3. Avvio dei Worker (Consumatori)
     workers = []
     for i in range(concurrency):
-        task = asyncio.create_task(run_worker(i, queue, state, config))
+        task = asyncio.create_task(run_worker(i, queue, state, config, registro))
         workers.append(task)
-        
+
     # 4. Avvio del Producer
     try:
-        # Aspettiamo che il producer finisca di leggere tutto il file PGN
-        await produce_tasks(config["pgn_path"], queue)
-        
+        # Aspettiamo che il producer finisca di leggere tutto il file
+        await produce_tasks(config["pgn_path"], queue, solo_finale)
+
         print("[*] Producer terminato. Attesa svuotamento della coda...")
         # Aspettiamo che i worker processino tutto quello che è rimasto in coda
         await queue.join()
-        
+
     except KeyboardInterrupt:
         print("\n[!] Interruzione manuale (CTRL+C) rilevata. Spegnimento grazioso in corso...")
-    
+
     finally:
         # 5. Spegnimento Grazioso dei Worker (Poison Pill)
         print("[*] Invio segnale di spegnimento ai motori...")
         for _ in range(concurrency):
             await queue.put(None)
-            
-        await asyncio.gather(*workers)
-        
+
+        # return_exceptions=True: se un worker e' caduto, l'export avviene comunque
+        esiti = await asyncio.gather(*workers, return_exceptions=True)
+        for i, e in enumerate(esiti):
+            if isinstance(e, BaseException):
+                print(f"[!] Il worker {i} si e' interrotto con errore: {e!r}")
+        if registro is not None:
+            registro.chiudi()
+
         # 6. Esportazione Finale
         print("\n==================================================")
         print("   Analisi Completata. Generazione Output...      ")
         print("==================================================")
-        
+
         all_nuggets = state.get_all_nuggets()
-        
+
         jsonl_path = os.path.join(config["output_dir"], "nuggets.jsonl")
         csv_path = os.path.join(config["output_dir"], "nuggets.csv")
         html_path = os.path.join(config["output_dir"], "dashboard.html")
-        
+
         exporter.export_jsonl(all_nuggets, jsonl_path)
         exporter.export_csv(all_nuggets, csv_path)
         exporter.export_html_summary(all_nuggets, html_path)
-        
+
         elapsed = time.time() - start_time
+        meta.update({"fine": datetime.now().isoformat(timespec="seconds"),
+                     "durata_secondi": round(elapsed, 1), "pepite": len(all_nuggets)})
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
         print(f"\n[FINE] Trovate {len(all_nuggets)} pepite uniche.")
         print(f"[FINE] Tempo totale: {elapsed:.2f} secondi.")
 
@@ -999,17 +2314,19 @@ if __name__ == "__main__":
     # Su Windows, per evitare errori con asyncio e subprocessi
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-        
+
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         pass # Già gestito internamente
+
 
 ////////////////////////////////////////////////////////////////////////////////
 /// PERCORSO: src\pgn_producer.py
 ////////////////////////////////////////////////////////////////////////////////
 
 import asyncio
+import csv
 import chess
 import chess.pgn
 
@@ -1027,58 +2344,99 @@ def build_variant_string(san_moves: list) -> str:
             result.append(move)
     return " ".join(result)
 
-async def produce_tasks(pgn_path: str, queue: asyncio.Queue):
+
+def _formato(path: str) -> str:
+    p = path.lower()
+    if p.endswith(".epd"):
+        return "epd"
+    if p.endswith(".csv"):
+        return "csv"
+    return "pgn"
+
+
+def iter_positions(path: str, solo_finale: bool = False):
     """
-    Legge il file PGN in streaming. Estrae le posizioni, la data e la variante,
-    e le inserisce nella coda per i worker.
+    Generatore sincrono delle posizioni da analizzare: (board, data, variante).
+      - .pgn : tutte le posizioni della linea principale (dopo ogni mossa); con
+               solo_finale=True soltanto la posizione finale di ogni partita/linea
+               (utile per i file di aperture come Test2026.pgn);
+      - .epd : una posizione per riga (opcode 'id' come variante, se presente);
+      - .csv : colonna FEN (FEN completa); colonna Variante_PGN se presente
+               (es. il registro di un'estrazione precedente, per la rianalisi con Lc0).
     """
-    print(f"[PRODUCER] Inizio lettura del file: {pgn_path}")
-    
+    fmt = _formato(path)
+    if fmt == "epd":
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            for riga in f:
+                riga = riga.strip()
+                if not riga or riga.startswith("#"):
+                    continue
+                board, ops = chess.Board.from_epd(riga)
+                yield board, "1900.01.01", str(ops.get("id", ""))
+        return
+    if fmt == "csv":
+        with open(path, newline="", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                if r.get("FEN"):
+                    yield chess.Board(r["FEN"]), r.get("Data") or r.get("Data_Recente") or "1900.01.01", r.get("Variante_PGN", "")
+        return
     # Usiamo errors='ignore' perché i vecchi DB PGN hanno spesso caratteri invalidi negli header
-    with open(pgn_path, "r", encoding="utf-8", errors="ignore") as pgn_file:
-        games_processed = 0
-        
+    with open(path, "r", encoding="utf-8", errors="ignore") as pgn_file:
         while True:
             # Legge una singola partita dal file
             game = chess.pgn.read_game(pgn_file)
             if game is None:
                 break  # Fine del file raggiunta
-            
-            games_processed += 1
-            
+
             # Estrae la data. Formato standard PGN: YYYY.MM.DD
             game_date = game.headers.get("Date", "1900.01.01")
             if "?" in game_date:  # Gestisce date sconosciute (es. "????.??.??")
                 game_date = "1900.01.01"
-            
+
             board = game.board()
             san_moves = []
-            
+
             # Scorre tutte le mosse della linea principale
             for move in game.mainline_moves():
                 # Salviamo la notazione SAN prima di muovere per costruire la variante
                 san_moves.append(board.san(move))
                 board.push(move)
-                
-                board_copy = board.copy()
-                variant_str = build_variant_string(san_moves)
-                
-                # Crea il pacchetto dati
-                task_payload = (board_copy, game_date, variant_str)
-                
-                # .put() è bloccante (in modo asincrono). Se la coda ha raggiunto la sua maxsize,
-                # il producer si ferma qui e attende che i worker la svuotino, salvando la RAM.
-                await queue.put(task_payload)
-            
-            # Cede brevemente il controllo all'event loop per non "soffocare" i worker
-            # durante il parsing massivo
-            await asyncio.sleep(0)
-            
-            # Un piccolo feedback visivo ogni 1000 partite lette
-            if games_processed % 1000 == 0:
-                print(f"[PRODUCER] Lette {games_processed} partite dal PGN...")
+                if not solo_finale:
+                    yield board.copy(), game_date, build_variant_string(san_moves)
+            if solo_finale and san_moves:
+                yield board.copy(), game_date, build_variant_string(san_moves)
 
-    print(f"[PRODUCER] Lettura completata! Totale partite: {games_processed}")
+
+async def produce_tasks(pgn_path: str, queue: asyncio.Queue, solo_finale: bool = False):
+    """
+    Legge il file in streaming. Estrae le posizioni, la data e la variante,
+    e le inserisce nella coda per i worker.
+    """
+    print(f"[PRODUCER] Inizio lettura del file: {pgn_path}")
+    n = 0
+    for task_payload in iter_positions(pgn_path, solo_finale):
+        # .put() è bloccante (in modo asincrono). Se la coda ha raggiunto la sua maxsize,
+        # il producer si ferma qui e attende che i worker la svuotino, salvando la RAM.
+        await queue.put(task_payload)
+        n += 1
+        # Cede brevemente il controllo all'event loop per non "soffocare" i worker
+        if n % 200 == 0:
+            await asyncio.sleep(0)
+        # Un piccolo feedback visivo ogni 10000 posizioni lette
+        if n % 10000 == 0:
+            print(f"[PRODUCER] Lette {n} posizioni...")
+
+    print(f"[PRODUCER] Lettura completata! Totale posizioni: {n}")
+
+
+def count_positions(pgn_path: str, solo_finale: bool = False):
+    """Conta le posizioni e le FEN distinte (stessa chiave usata dalla cache), senza analizzarle."""
+    totale, distinte = 0, set()
+    for board, _, _ in iter_positions(pgn_path, solo_finale):
+        totale += 1
+        distinte.add(board.fen())
+    return totale, len(distinte)
+
 
 ////////////////////////////////////////////////////////////////////////////////
 /// PERCORSO: src\qualimetria.py
@@ -1318,6 +2676,129 @@ def get_material_imbalance(board: chess.Board) -> float:
     w_mat = sum(STANDARD_PIECE_VALUES[p.piece_type] for p in board.piece_map().values() if p.color == chess.WHITE)
     b_mat = sum(STANDARD_PIECE_VALUES[p.piece_type] for p in board.piece_map().values() if p.color == chess.BLACK)
     return round(abs(w_mat - b_mat), 2)
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: src\registro.py
+////////////////////////////////////////////////////////////////////////////////
+
+"""
+Registro incrementale delle posizioni analizzate e criteri delle pepite.
+
+- Registro: ogni posizione analizzata viene scritta SUBITO in un CSV (una riga per FEN),
+  pepita o no. Se l'estrazione si interrompe (crash, riavvio, CTRL+C), al rilancio le FEN
+  gia' presenti nel registro non vengono rianalizzate: i valori W/D/L salvati vengono
+  riusati e le soglie correnti del config vengono riapplicate. Cosi' si possono anche
+  cambiare le soglie (tolleranza, delta, opposite_max) senza ripetere le analisi.
+- classifica(): la regola della pepita, identica a quella di engine_worker.py dopo la patch
+  del 12/11/2026 (Pwin dal punto di vista del Bianco, L = 0 per le pepite a 0,75,
+  W = 0 per quelle a 0,25), con la soglia del Delta separata dalla tolleranza su Pwin.
+
+Il modulo non dipende da python-chess, quindi si puo' collaudare da solo.
+"""
+import csv
+import os
+
+CAMPI = [
+    "FEN", "Stato", "Tratto", "Semimossa",
+    "W1", "D1", "L1", "W2", "D2", "L2", "Pwin1", "Pwin2", "Delta",
+    "CP1", "CP2", "Mossa1", "Mossa2",
+    "Profondita1", "Profondita2", "SelDepth", "Nodi", "NPS", "Tempo", "TBHits",
+    "Fase", "Centro", "Tensione", "Imbalance",
+    "Data", "Variante_PGN", "Motore",
+]
+
+# Stati che non richiedono una nuova analisi alla ripresa ("Errore" invece si rianalizza)
+STATI_CONCLUSI = {"Nugget", "Non nugget", "Scartata"}
+
+
+def frazioni_wdl(wins, draws, losses):
+    """Converte i conteggi WDL del motore (per mille) in frazioni che sommano a 1."""
+    tot = wins + draws + losses
+    if tot <= 0:
+        raise ValueError("WDL con totale nullo")
+    return wins / tot, draws / tot, losses / tot
+
+
+def classifica(wdl1, wdl2, wdl_tolerance, delta_max, opposite_max):
+    """
+    Applica la regola della pepita alle terne (W, D, L) delle due linee migliori,
+    entrambe dal punto di vista del Bianco.
+
+    Restituisce un dizionario con: pepita (bool), tipo ('bianca', 'nera' o None),
+    pwin1, pwin2 (= W + D/2) e delta (= |pwin1 - pwin2|).
+    """
+    w1, d1, l1 = wdl1
+    w2, d2, l2 = wdl2
+    pwin1 = w1 + d1 / 2.0
+    pwin2 = w2 + d2 / 2.0
+    delta = abs(pwin1 - pwin2)
+    eps = 1e-9
+    bianca = (0.75 - wdl_tolerance - eps <= pwin1 <= 0.75 + wdl_tolerance + eps) and l1 <= opposite_max + eps
+    nera = (0.25 - wdl_tolerance - eps <= pwin1 <= 0.25 + wdl_tolerance + eps) and w1 <= opposite_max + eps
+    delta_ok = delta <= delta_max + eps
+    tipo = "bianca" if bianca else ("nera" if nera else None)
+    return {"pepita": bool(tipo) and delta_ok, "tipo": tipo, "pwin1": pwin1, "pwin2": pwin2, "delta": delta}
+
+
+def _num(x):
+    if x is None or x == "":
+        return None
+    return float(x)
+
+
+def wdl_da_riga(riga):
+    """Restituisce ((W1, D1, L1), (W2, D2, L2)) da una riga del registro, o None se mancano."""
+    vals = [_num(riga.get(k)) for k in ("W1", "D1", "L1", "W2", "D2", "L2")]
+    if any(v is None for v in vals):
+        return None
+    return tuple(vals[:3]), tuple(vals[3:])
+
+
+class Registro:
+    """CSV in sola aggiunta con tutte le posizioni analizzate; riletto alla ripresa."""
+
+    def __init__(self, path):
+        self.path = path
+        self.fatte = {}
+        self.righe_scartate = 0
+        esiste = os.path.exists(path) and os.path.getsize(path) > 0
+        if esiste:
+            with open(path, newline="", encoding="utf-8") as f:
+                for riga in csv.DictReader(f):
+                    # Una riga troncata (interruzione durante la scrittura) non ha lo Stato: si ignora
+                    if not riga.get("FEN") or riga.get("Stato") not in STATI_CONCLUSI:
+                        self.righe_scartate += 1
+                        continue
+                    self.fatte[riga["FEN"]] = riga
+            # Se l'ultima riga e' stata troncata, il file non termina con un a capo: lo aggiungiamo
+            with open(path, "rb") as fb:
+                fb.seek(-1, os.SEEK_END)
+                manca_a_capo = fb.read(1) not in (b"\n", b"\r")
+        self._f = open(path, "a", newline="", encoding="utf-8")
+        if esiste and manca_a_capo:
+            self._f.write("\n")
+        self._w = csv.DictWriter(self._f, fieldnames=CAMPI, extrasaction="ignore")
+        if not esiste:
+            self._w.writeheader()
+            self._f.flush()
+
+    def __len__(self):
+        return len(self.fatte)
+
+    def gia_analizzata(self, fen):
+        """La riga salvata per questa FEN, oppure None se va (ri)analizzata."""
+        return self.fatte.get(fen)
+
+    def scrivi(self, riga):
+        """Scrive subito su disco: un'interruzione fa perdere al massimo la riga in corso."""
+        self._w.writerow(riga)
+        self._f.flush()
+        if riga.get("Stato") in STATI_CONCLUSI:
+            self.fatte[riga["FEN"]] = riga
+
+    def chiudi(self):
+        self._f.close()
+
 
 ////////////////////////////////////////////////////////////////////////////////
 /// PERCORSO: src\state_manager.py
@@ -1601,5 +3082,67 @@ StressReached=0
 StressMax=0
 TrainingWithClock=1
 RandomTraining=1
+
+
+////////////////////////////////////////////////////////////////////////////////
+/// PERCORSO: tests\test_registro.py
+////////////////////////////////////////////////////////////////////////////////
+
+"""Collaudo del registro incrementale e della regola delle pepite (non richiede python-chess).
+Uso: python tests/test_registro.py"""
+import os, sys, tempfile
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+from registro import Registro, classifica, frazioni_wdl, wdl_da_riga
+
+CRIT = dict(wdl_tolerance=0.06, delta_max=0.06, opposite_max=0.0)
+
+def test_classifica():
+    # pepita bianca ideale: (0.5, 0.5, 0) e seconda linea vicina
+    e = classifica((0.5, 0.5, 0.0), (0.48, 0.52, 0.0), **CRIT)
+    assert e["pepita"] and e["tipo"] == "bianca" and abs(e["pwin1"] - 0.75) < 1e-12 and abs(e["delta"] - 0.01) < 1e-12
+    # pepita nera: (0, 0.5, 0.5)
+    e = classifica((0.0, 0.5, 0.5), (0.0, 0.46, 0.54), **CRIT)
+    assert e["pepita"] and e["tipo"] == "nera"
+    # L > 0 con opposite_max = 0: non e' pepita
+    assert not classifica((0.52, 0.47, 0.01), (0.5, 0.5, 0.0), **CRIT)["pepita"]
+    # ...ma lo e' con opposite_max = 0.02
+    assert classifica((0.52, 0.47, 0.01), (0.5, 0.5, 0.0), wdl_tolerance=0.06, delta_max=0.06, opposite_max=0.02)["pepita"]
+    # Delta oltre la soglia
+    assert not classifica((0.5, 0.5, 0.0), (0.3, 0.7, 0.0), **CRIT)["pepita"]
+    # delta_max separato dalla tolleranza su Pwin
+    assert not classifica((0.5, 0.5, 0.0), (0.44, 0.56, 0.0), wdl_tolerance=0.06, delta_max=0.02, opposite_max=0.0)["pepita"]
+    # Pwin fuori finestra (0.60)
+    assert not classifica((0.2, 0.8, 0.0), (0.2, 0.8, 0.0), **CRIT)["pepita"]
+    # bordi della finestra (0.69 e 0.81) inclusi
+    assert classifica((0.38, 0.62, 0.0), (0.38, 0.62, 0.0), **CRIT)["pepita"]
+    assert classifica((0.62, 0.38, 0.0), (0.62, 0.38, 0.0), **CRIT)["pepita"]
+    assert frazioni_wdl(500, 500, 0) == (0.5, 0.5, 0.0)
+
+def test_registro_ripresa():
+    d = tempfile.mkdtemp()
+    p = os.path.join(d, "reg.csv")
+    r = Registro(p)
+    r.scrivi({"FEN": "f1", "Stato": "Nugget", "W1": 0.5, "D1": 0.5, "L1": 0, "W2": 0.49, "D2": 0.51, "L2": 0})
+    r.scrivi({"FEN": "f2", "Stato": "Non nugget"})
+    r.scrivi({"FEN": "f3", "Stato": "Errore"})          # da rianalizzare
+    r.chiudi()
+    # simuliamo un'interruzione a meta' riga
+    with open(p, "a", encoding="utf-8") as f:
+        f.write("f4,Nug")
+    r2 = Registro(p)
+    assert set(r2.fatte) == {"f1", "f2"}, r2.fatte.keys()
+    assert r2.righe_scartate == 2
+    assert r2.gia_analizzata("f3") is None and r2.gia_analizzata("f1")["Stato"] == "Nugget"
+    w = wdl_da_riga(r2.gia_analizzata("f1"))
+    assert w == ((0.5, 0.5, 0.0), (0.49, 0.51, 0.0))
+    # nuova scrittura dopo la riga troncata: deve finire su una riga nuova
+    r2.scrivi({"FEN": "f5", "Stato": "Non nugget"})
+    r2.chiudi()
+    r3 = Registro(p)
+    assert "f5" in r3.fatte and "f1" in r3.fatte
+    r3.chiudi()
+
+if __name__ == "__main__":
+    test_classifica(); test_registro_ripresa(); print("tutti i test superati")
 
 

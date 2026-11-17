@@ -10,6 +10,11 @@
     - generaDiagrammi.py
     - genera_pgn.py
     - tournament_visuals.py
+  + revisione2026
+    - confronta_oracoli.py
+    - misura_nps.py
+    - stabilita_registri.py
+    - statistiche_match.py
 + src
   + outputLTCWch
     - generaDiagrammi.py
@@ -20,5 +25,8 @@
   - main.py
   - pgn_producer.py
   - qualimetria.py
+  - registro.py
   - state_manager.py
++ tests
+  - test_registro.py
 - esporta_sorgenti.py
