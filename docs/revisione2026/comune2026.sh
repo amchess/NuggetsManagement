@@ -5,13 +5,15 @@
 
 # --- Motori: ultime versioni (aggiornare percorsi e nomi prima di partire) -------------
 SF=/home/sdp/Stockfish/src/Stockfish19-universal
-SC=/home/sdp/ShashChessDev/src/ShashChess42-universal
+SC=/home/sdp/git/ShashChess/src/ShashChess42.3-universal
 RK=/home/sdp/Reckless/target/release/reckless          # da adattare al percorso reale
 PC=/home/sdp/PlentyChess/PlentyChess                   # da adattare al percorso reale
+TR=/home/sdp/Triumviratus/Triumviratus_8.1_linux_avx512   # da adattare al percorso reale
 NOME_SF=Stockfish19
-NOME_SC=ShashChess42
+NOME_SC=ShashChess42.3
 NOME_RK=Reckless          # mettere la versione nel nome, es. Reckless0.9.0
 NOME_PC=PlentyChess       # es. PlentyChess8.0.0
+NOME_TR=Triumviratus8.1
 
 # --- Condizioni di gioco: identiche in tutti gli esperimenti --------------------------
 TB=/home/sdp/syzygy                     # piu' cartelle: separarle con ':'
@@ -38,7 +40,8 @@ definisci_motore() {
     SC) M_NOME=$NOME_SC; M_CMD=$SC; M_EXTRA=("Persisted learning=Off" "Experience Book=false") ;;
     RK) M_NOME=$NOME_RK; M_CMD=$RK; M_EXTRA=() ;;
     PC) M_NOME=$NOME_PC; M_CMD=$PC; M_EXTRA=() ;;
-    *)  echo "[ERRORE] motore sconosciuto: $1 (codici ammessi: SF SC RK PC)" >&2; return 1 ;;
+    TR) M_NOME=$NOME_TR; M_CMD=$TR; M_EXTRA=() ;;
+    *)  echo "[ERRORE] motore sconosciuto: $1 (codici ammessi: SF SC RK PC TR)" >&2; return 1 ;;
   esac
   [[ -x $M_CMD ]] || { echo "[ERRORE] eseguibile non trovato o non eseguibile: $M_CMD" >&2; return 1; }
 }
