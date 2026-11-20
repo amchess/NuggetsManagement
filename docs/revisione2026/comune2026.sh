@@ -6,12 +6,12 @@
 # --- Motori: ultime versioni (aggiornare percorsi e nomi prima di partire) -------------
 SF=/home/sdp/Stockfish/src/Stockfish19-universal
 SC=/home/sdp/git/ShashChess/src/ShashChess42.3-universal
-RK=/home/sdp/Reckless/target/release/reckless          # da adattare al percorso reale
-PC=/home/sdp/PlentyChess/PlentyChess                   # da adattare al percorso reale
-TR=/home/sdp/Triumviratus/Triumviratus_8.1_linux_avx512   # da adattare al percorso reale
+RK=/home/sdp/engines/Reckless-0.9.0/reckless-linux-avx512            # release ufficiale v0.9.0
+PC=/home/sdp/PlentyChess/PlentyChess                   # non usato nella revisione 2026 (sostituito da Triumviratus)
+TR=/home/sdp/engines/Triumviratus-8.1/Triumviratus_8.1_linux_avx512  # release ufficiale v8.1 (checksum verificato)
 NOME_SF=Stockfish19
 NOME_SC=ShashChess42.3
-NOME_RK=Reckless          # mettere la versione nel nome, es. Reckless0.9.0
+NOME_RK=Reckless0.9.0
 NOME_PC=PlentyChess       # es. PlentyChess8.0.0
 NOME_TR=Triumviratus8.1
 
@@ -40,7 +40,12 @@ definisci_motore() {
     SC) M_NOME=$NOME_SC; M_CMD=$SC; M_EXTRA=("Persisted learning=Off" "Experience Book=false") ;;
     RK) M_NOME=$NOME_RK; M_CMD=$RK; M_EXTRA=() ;;
     PC) M_NOME=$NOME_PC; M_CMD=$PC; M_EXTRA=() ;;
-    TR) M_NOME=$NOME_TR; M_CMD=$TR; M_EXTRA=() ;;
+    # Triumviratus: con NumaSpread=true (default) il thread i si lega al nodo NUMA i % nodi. Su questa macchina
+    # (6 nodi da 32 core) ogni istanza a 4 thread occuperebbe sempre i nodi 0-3, a cavallo dei due socket, con le
+    # history divise per nodo. Gli altri motori a 4 thread non si legano: Stockfish e ShashChess (NumaPolicy=auto)
+    # legano solo da 17 thread in su, Reckless non ha codice NUMA. Con false i thread li assegna il sistema
+    # operativo, come per gli altri tre, e la ricerca resta quella "a un nodo" dei test dell'autore.
+    TR) M_NOME=$NOME_TR; M_CMD=$TR; M_EXTRA=("NumaSpread=false") ;;
     *)  echo "[ERRORE] motore sconosciuto: $1 (codici ammessi: SF SC RK PC TR)" >&2; return 1 ;;
   esac
   [[ -x $M_CMD ]] || { echo "[ERRORE] eseguibile non trovato o non eseguibile: $M_CMD" >&2; return 1; }
@@ -100,17 +105,22 @@ descrivi_macchina() {
   } > "$1/macchina.txt" 2>&1
 }
 
-# Firma dei motori: id, hash dell'eseguibile, firma di bench (se il motore la fornisce)
+# Firma dei motori: id, hash dell'eseguibile, firma di bench.
+# Il bench si chiede prima dalla riga di comando (Stockfish, ShashChess, Reckless) con un "quit" su stdin, cosi'
+# nessun motore resta in attesa del terminale; chi ignora la riga di comando (Triumviratus) esce subito e allora
+# il bench gli si chiede come comando UCI.
 firma_motori() {
-  local dir=$1 cmd
+  local dir=$1 cmd b
   shift
   for cmd in "$@"; do
+    b=$(cd "$(dirname "$cmd")" && printf 'quit\n' | timeout 900 "$cmd" bench 2>&1 | grep -iE 'nodes|nps|bench' | tail -3 || true)
+    [[ -n $b ]] || b=$(cd "$(dirname "$cmd")" && printf 'bench\nquit\n' | timeout 900 "$cmd" 2>&1 | grep -iE 'nodes|nps|bench' | tail -3 || true)
     {
       echo "== $cmd"
       sha256sum "$cmd"
       printf 'uci\nquit\n' | timeout 60 "$cmd" 2>/dev/null | grep -E '^id (name|author)' || true
       echo "-- bench"
-      (cd "$(dirname "$cmd")" && timeout 900 "$cmd" bench 2>&1 | grep -iE 'nodes|nps|bench' | tail -3) || true
+      echo "${b:-(nessuna firma di bench)}"
       echo
     } >> "$dir/motori.txt"
   done

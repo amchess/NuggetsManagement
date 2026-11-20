@@ -10,7 +10,7 @@
 #
 # Uso:   ./roundrobin_nuggets2026.sh POSIZIONI.epd ETICHETTA [CICLI]
 #   partite = 6 coppie x 2 colori x posizioni x CICLI  (100 posizioni -> 1.200 partite)
-# Variabili opzionali: MOTORI (default "SF SC RK PC"), CONC (default 47), PARALLELO=0 (coppie una
+# Variabili opzionali: MOTORI (default "SF SC RK TR"), CONC (default 47), PARALLELO=0 (coppie una
 #   dopo l'altra, ciascuna con CONC partite simultanee), DRY=1 (scrive i comandi senza giocare)
 set -euo pipefail
 QUI=$(cd "$(dirname "$0")" && pwd)
@@ -24,7 +24,7 @@ CICLI=${3:-1}
 FMT=$(formato_aperture "$POS")
 NPOS=$(conta_aperture "$POS")
 ROUNDS=$(( NPOS * CICLI ))
-read -r -a CODICI <<< "${MOTORI:-SF SC RK PC}"
+read -r -a CODICI <<< "${MOTORI:-SF SC RK TR}"
 (( ${#CODICI[@]} >= 3 )) || { echo "[ERRORE] servono almeno 3 motori" >&2; exit 1; }
 
 OUT=$BASE/risultati/$(date +%Y%m%d_%H%M)_rr_${ETI}
