@@ -1,0 +1,16 @@
+{
+    "engine_path": "/home/sdp/Stockfish/src/Stockfish19-universal",
+    "pgn_path": "docs/revisione2026/posizioni/uho_screening_1200.epd",
+    "output_dir": "data/outputUHO2024_SF19",
+    "concurrency": 47,
+    "analysis_time": 60.0,
+    "wdl_tolerance": 0.06,
+    "delta_max": 0.06,
+    "opposite_max": 0.0,
+    "threads": 4,
+    "hash": 2048,
+    "syzygy_path": "/home/sdp/syzygy",
+    "nuova_partita_per_posizione": true,
+    "registro": true,
+    "registro_csv": "tutte_le_posizioni.csv"
+}

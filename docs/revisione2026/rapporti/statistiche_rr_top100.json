@@ -1,0 +1,577 @@
+{
+ "etichetta": "Round robin 2026 sulle Top-100 robuste",
+ "file": [
+  "dati/20261120_0014_rr_top100_robusto/partite_Reckless0.9.0_Triumviratus8.1.pgn",
+  "dati/20261120_0014_rr_top100_robusto/partite_ShashChess42.3_Reckless0.9.0.pgn",
+  "dati/20261120_0014_rr_top100_robusto/partite_ShashChess42.3_Triumviratus8.1.pgn",
+  "dati/20261120_0014_rr_top100_robusto/partite_Stockfish19_Reckless0.9.0.pgn",
+  "dati/20261120_0014_rr_top100_robusto/partite_Stockfish19_ShashChess42.3.pgn",
+  "dati/20261120_0014_rr_top100_robusto/partite_Stockfish19_Triumviratus8.1.pgn"
+ ],
+ "partite": 1200,
+ "motori": [
+  "Reckless0.9.0",
+  "ShashChess42.3",
+  "Stockfish19",
+  "Triumviratus8.1"
+ ],
+ "coppie": 600,
+ "partite_spaiate": 0,
+ "classifica": {
+  "Reckless0.9.0": {
+   "partite": 600,
+   "V": 68,
+   "P": 344,
+   "S": 188,
+   "punti": 240.0
+  },
+  "ShashChess42.3": {
+   "partite": 600,
+   "V": 158,
+   "P": 336,
+   "S": 106,
+   "punti": 326.0
+  },
+  "Stockfish19": {
+   "partite": 600,
+   "V": 162,
+   "P": 325,
+   "S": 113,
+   "punti": 324.5
+  },
+  "Triumviratus8.1": {
+   "partite": 600,
+   "V": 134,
+   "P": 351,
+   "S": 115,
+   "punti": 309.5
+  }
+ },
+ "copertura": {
+  "Reckless0.9.0 - ShashChess42.3": {
+   "posizioni": 100,
+   "partite": 200,
+   "partite_per_posizione": {
+    "2": 100
+   }
+  },
+  "Reckless0.9.0 - Stockfish19": {
+   "posizioni": 100,
+   "partite": 200,
+   "partite_per_posizione": {
+    "2": 100
+   }
+  },
+  "Reckless0.9.0 - Triumviratus8.1": {
+   "posizioni": 100,
+   "partite": 200,
+   "partite_per_posizione": {
+    "2": 100
+   }
+  },
+  "ShashChess42.3 - Stockfish19": {
+   "posizioni": 100,
+   "partite": 200,
+   "partite_per_posizione": {
+    "2": 100
+   }
+  },
+  "ShashChess42.3 - Triumviratus8.1": {
+   "posizioni": 100,
+   "partite": 200,
+   "partite_per_posizione": {
+    "2": 100
+   }
+  },
+  "Stockfish19 - Triumviratus8.1": {
+   "posizioni": 100,
+   "partite": 200,
+   "partite_per_posizione": {
+    "2": 100
+   }
+  }
+ },
+ "disegno_incrociato": true,
+ "posizioni": 100,
+ "accoppiamenti": {
+  "Reckless0.9.0 vs ShashChess42.3": {
+   "trinomiale": {
+    "partite": 200,
+    "V": 23,
+    "P": 113,
+    "S": 64,
+    "punteggio": 0.3975,
+    "es": 0.022163455281160472,
+    "z": -4.624730156002693,
+    "p": 3.750863885590388e-06,
+    "elo": -72.24796730176675,
+    "elo_inf": -104.44640849175128,
+    "elo_sup": -41.2313065685269
+   },
+   "pentanomiale": {
+    "coppie": 100,
+    "conteggi": [
+     0,
+     42,
+     57,
+     1,
+     0
+    ],
+    "punteggio": 0.3975,
+    "var_coppia": 0.01636875,
+    "es": 0.012794041581923985,
+    "z": -8.011541884060836,
+    "p": 1.1327914226868557e-15,
+    "elo": -72.24796730176675,
+    "elo_es": 9.280211546681842,
+    "elo_inf": -90.65170554514435,
+    "elo_sup": -54.235772320670115,
+    "t1": -0.5665015593979467
+   },
+   "cluster": {
+    "posizioni": 100,
+    "punteggio": 0.3975,
+    "es": 0.012858495599832395,
+    "t": -7.9713835264940345,
+    "gl": 99,
+    "p": 2.763955731612429e-12,
+    "elo": -72.24796730176675,
+    "elo_inf": -90.97712549690605,
+    "elo_sup": -53.924181854871975,
+    "migliore_A": 1,
+    "migliore_B": 42,
+    "pari": 57,
+    "p_segno": 1.000444171950221e-11,
+    "boot_inf": -90.59498122750566,
+    "boot_sup": -54.29011011138832
+   },
+   "mcnemar": {
+    "entrambi": 22,
+    "nessuno": 35,
+    "solo_A": 1,
+    "solo_B": 42,
+    "p": 1.000444171950221e-11
+   },
+   "posizioni": 100,
+   "partite_per_posizione": {
+    "2": 100
+   }
+  },
+  "Reckless0.9.0 vs Stockfish19": {
+   "trinomiale": {
+    "partite": 200,
+    "V": 25,
+    "P": 109,
+    "S": 66,
+    "punteggio": 0.3975,
+    "es": 0.022720447838896134,
+    "z": -4.511354737670519,
+    "p": 6.4414889629028495e-06,
+    "elo": -72.24796730176675,
+    "elo_inf": -105.27622946899177,
+    "elo_sup": -40.4621780681759
+   },
+   "pentanomiale": {
+    "coppie": 100,
+    "conteggi": [
+     0,
+     46,
+     49,
+     5,
+     0
+    ],
+    "punteggio": 0.3975,
+    "var_coppia": 0.02136875,
+    "es": 0.014618053906043718,
+    "z": -7.011877275785812,
+    "p": 2.351414241290017e-12,
+    "elo": -72.24796730176675,
+    "elo_es": 10.603266511228894,
+    "elo_inf": -93.3141534956965,
+    "elo_sup": -51.69337295411598,
+    "t1": -0.4958145970556004
+   },
+   "cluster": {
+    "posizioni": 100,
+    "punteggio": 0.3975,
+    "es": 0.01469169696107157,
+    "t": -6.976729799940274,
+    "gl": 99,
+    "p": 3.459050882999067e-10,
+    "elo": -72.24796730176675,
+    "elo_inf": -93.68746103497509,
+    "elo_sup": -51.33815146495843,
+    "migliore_A": 5,
+    "migliore_B": 46,
+    "pari": 49,
+    "p_segno": 2.3280151140170346e-09,
+    "boot_inf": -94.32127457105672,
+    "boot_sup": -52.511565855727596
+   },
+   "mcnemar": {
+    "entrambi": 20,
+    "nessuno": 29,
+    "solo_A": 5,
+    "solo_B": 46,
+    "p": 2.3280151140170346e-09
+   },
+   "posizioni": 100,
+   "partite_per_posizione": {
+    "2": 100
+   }
+  },
+  "Reckless0.9.0 vs Triumviratus8.1": {
+   "trinomiale": {
+    "partite": 200,
+    "V": 20,
+    "P": 122,
+    "S": 58,
+    "punteggio": 0.405,
+    "es": 0.021032712616303205,
+    "z": -4.516773548570339,
+    "p": 6.278898950910903e-06,
+    "elo": -66.82477700555239,
+    "elo_inf": -97.1104894311399,
+    "elo_sup": -37.51239996175284
+   },
+   "pentanomiale": {
+    "coppie": 100,
+    "conteggi": [
+     0,
+     41,
+     56,
+     3,
+     0
+    ],
+    "punteggio": 0.405,
+    "var_coppia": 0.018475,
+    "es": 0.013592277219068187,
+    "z": -6.98926298138824,
+    "p": 2.7633402116181087e-12,
+    "elo": -66.82477700555239,
+    "elo_es": 9.798611462169255,
+    "elo_inf": -86.25413164708213,
+    "elo_sup": -47.80011734344104,
+    "t1": -0.4942155249635731
+   },
+   "cluster": {
+    "posizioni": 100,
+    "punteggio": 0.405,
+    "es": 0.013660752600649851,
+    "t": -6.9542288611156575,
+    "gl": 99,
+    "p": 3.850584860552716e-10,
+    "elo": -66.82477700555239,
+    "elo_inf": -86.59768120559062,
+    "elo_sup": -47.470866396944075,
+    "migliore_A": 3,
+    "migliore_B": 41,
+    "pari": 56,
+    "p_segno": 1.6183321349672042e-09,
+    "boot_inf": -86.88895992102678,
+    "boot_sup": -47.19190162573095
+   },
+   "mcnemar": {
+    "entrambi": 17,
+    "nessuno": 39,
+    "solo_A": 3,
+    "solo_B": 41,
+    "p": 1.6183321349672042e-09
+   },
+   "posizioni": 100,
+   "partite_per_posizione": {
+    "2": 100
+   }
+  },
+  "ShashChess42.3 vs Stockfish19": {
+   "trinomiale": {
+    "partite": 200,
+    "V": 48,
+    "P": 105,
+    "S": 47,
+    "punteggio": 0.5025,
+    "es": 0.024366344617114812,
+    "z": 0.1026005352581264,
+    "p": 0.918280018008651,
+    "elo": 1.7371924043128415,
+    "elo_inf": -31.534816325318317,
+    "elo_sup": 35.04119226575942
+   },
+   "pentanomiale": {
+    "coppie": 100,
+    "conteggi": [
+     0,
+     11,
+     77,
+     12,
+     0
+    ],
+    "punteggio": 0.5025,
+    "var_coppia": 0.01436875,
+    "es": 0.011986972094736852,
+    "z": 0.20855975806414262,
+    "p": 0.8347919280882334,
+    "elo": 1.7371924043128415,
+    "elo_es": 8.32960957699539,
+    "elo_inf": -14.59703126010298,
+    "elo_sup": 18.079104667058303,
+    "t1": 0.014747401920978098
+   },
+   "cluster": {
+    "posizioni": 100,
+    "punteggio": 0.5025,
+    "es": 0.012047360245667467,
+    "t": 0.20751433915981796,
+    "gl": 99,
+    "p": 0.8360344603231942,
+    "elo": 1.7371924043128415,
+    "elo_inf": -14.882518882434445,
+    "elo_sup": 18.364863671383176,
+    "migliore_A": 12,
+    "migliore_B": 11,
+    "pari": 77,
+    "p_segno": 1.0,
+    "boot_inf": -13.904842503684801,
+    "boot_sup": 17.386277512436145
+   },
+   "mcnemar": {
+    "entrambi": 36,
+    "nessuno": 41,
+    "solo_A": 12,
+    "solo_B": 11,
+    "p": 1.0
+   },
+   "posizioni": 100,
+   "partite_per_posizione": {
+    "2": 100
+   }
+  },
+  "ShashChess42.3 vs Triumviratus8.1": {
+   "trinomiale": {
+    "partite": 200,
+    "V": 46,
+    "P": 118,
+    "S": 36,
+    "punteggio": 0.525,
+    "es": 0.022569337606584736,
+    "z": 1.1076975512434235,
+    "p": 0.2679924572854546,
+    "elo": 17.386277512436145,
+    "elo_inf": -13.373073890857512,
+    "elo_sup": 48.421113216528305
+   },
+   "pentanomiale": {
+    "coppie": 100,
+    "conteggi": [
+     0,
+     11,
+     68,
+     21,
+     0
+    ],
+    "punteggio": 0.525,
+    "var_coppia": 0.019375,
+    "es": 0.013919410907075054,
+    "z": 1.7960530202677507,
+    "p": 0.07248608508684617,
+    "elo": 17.386277512436145,
+    "elo_es": 9.696438453392092,
+    "elo_inf": -1.5857385549579255,
+    "elo_sup": 36.46256542110992,
+    "t1": 0.12700012700019062
+   },
+   "cluster": {
+    "posizioni": 100,
+    "punteggio": 0.525,
+    "es": 0.013989534327741962,
+    "t": 1.787050191543813,
+    "gl": 99,
+    "p": 0.07698978161895363,
+    "elo": 17.386277512436145,
+    "elo_inf": -1.9166625524896457,
+    "elo_sup": 36.79717289386738,
+    "migliore_A": 21,
+    "migliore_B": 11,
+    "pari": 68,
+    "p_segno": 0.11018416518345475,
+    "boot_inf": -1.7371924043128577,
+    "boot_sup": 36.61569708208701
+   },
+   "mcnemar": {
+    "entrambi": 25,
+    "nessuno": 43,
+    "solo_A": 21,
+    "solo_B": 11,
+    "p": 0.11018416518345475
+   },
+   "posizioni": 100,
+   "partite_per_posizione": {
+    "2": 100
+   }
+  },
+  "Stockfish19 vs Triumviratus8.1": {
+   "trinomiale": {
+    "partite": 200,
+    "V": 49,
+    "P": 111,
+    "S": 40,
+    "punteggio": 0.5225,
+    "es": 0.023531229249658846,
+    "z": 0.9561761419806051,
+    "p": 0.3389832513557929,
+    "elo": 15.645167545330544,
+    "elo_inf": -16.42592471501221,
+    "elo_sup": 47.98570641916493
+   },
+   "pentanomiale": {
+    "coppie": 100,
+    "conteggi": [
+     0,
+     9,
+     73,
+     18,
+     0
+    ],
+    "punteggio": 0.5225,
+    "var_coppia": 0.01636875,
+    "es": 0.012794041581923985,
+    "z": 1.7586311452816448,
+    "p": 0.07864017934882889,
+    "elo": 15.645167545330544,
+    "elo_es": 8.908249862403906,
+    "elo_inf": -1.7902273815540555,
+    "elo_sup": 33.159733369697214,
+    "t1": 0.12435400084345152
+   },
+   "cluster": {
+    "posizioni": 100,
+    "punteggio": 0.5225,
+    "es": 0.012858495599832395,
+    "t": 1.7498158960596637,
+    "gl": 99,
+    "p": 0.08324862524496143,
+    "elo": 15.645167545330544,
+    "elo_inf": -2.0943983066978,
+    "elo_sup": 33.466699700148524,
+    "migliore_A": 18,
+    "migliore_B": 9,
+    "pari": 73,
+    "p_segno": 0.12207812070846558,
+    "boot_inf": -1.7371924043128577,
+    "boot_sup": 33.106215988373506
+   },
+   "mcnemar": {
+    "entrambi": 31,
+    "nessuno": 42,
+    "solo_A": 18,
+    "solo_B": 9,
+    "p": 0.12207812070846558
+   },
+   "posizioni": 100,
+   "partite_per_posizione": {
+    "2": 100
+   }
+  }
+ },
+ "bt": {
+  "Reckless0.9.0": -74.40672906654329,
+  "ShashChess42.3": 1.318326587498123,
+  "Stockfish19": 0.0,
+  "Triumviratus8.1": -13.15664640574649
+ },
+ "bt_ic": {
+  "Reckless0.9.0": [
+   -89.3897215715495,
+   -59.6347316739352
+  ],
+  "ShashChess42.3": [
+   -10.094030117169533,
+   13.157853388006009
+  ],
+  "Stockfish19": [
+   0.0,
+   0.0
+  ],
+  "Triumviratus8.1": [
+   -26.787394546333147,
+   0.010934671541634116
+  ]
+ },
+ "bt_ancora": [
+  "Stockfish19",
+  0.0
+ ],
+ "parte_favorita": {
+  "vittorie_favorita": 522,
+  "vittorie_sfavorita": 0,
+  "patte": 678,
+  "posizioni_favorito_bianco": 77,
+  "posizioni_favorito_nero": 23
+ },
+ "decisive": {
+  "totale": 522,
+  "quota": 0.435,
+  "posizioni_tutte_patte": 10,
+  "posizioni_tutte_decisive": 4
+ },
+ "decisive_per_fascia_eval": [
+  {
+   "fascia": "0-0.8",
+   "posizioni": 4,
+   "partite": 48,
+   "quota": 0.2916666666666667
+  },
+  {
+   "fascia": "0.8-0.9",
+   "posizioni": 9,
+   "partite": 108,
+   "quota": 0.1388888888888889
+  },
+  {
+   "fascia": "0.9-1.0",
+   "posizioni": 24,
+   "partite": 288,
+   "quota": 0.25
+  },
+  {
+   "fascia": "1.0-1.1",
+   "posizioni": 40,
+   "partite": 480,
+   "quota": 0.4875
+  },
+  {
+   "fascia": "1.1-1.2",
+   "posizioni": 17,
+   "partite": 204,
+   "quota": 0.6617647058823529
+  },
+  {
+   "fascia": "1.2-99",
+   "posizioni": 6,
+   "partite": 72,
+   "quota": 0.7222222222222222
+  }
+ ],
+ "esecuzione": {
+  "inizio": "2026-11-20 00:14:32.383000",
+  "fine": "2026-11-21 09:02:11.991000",
+  "ore": 32.794335555555556,
+  "max_partite_simultanee": 47,
+  "durata_media_min": 68.80802152777778
+ },
+ "terminazioni": {
+  "Draw by adjudication": 390,
+  "White wins by adjudication": 409,
+  "Draw by adjudication: SyzygyTB": 212,
+  "Draw by 3-fold repetition": 75,
+  "Black wins by adjudication": 106,
+  "White wins by adjudication: SyzygyTB": 7,
+  "Draw by fifty moves rule": 1
+ },
+ "profondita_mediana": {
+  "Reckless0.9.0": 35.0,
+  "Triumviratus8.1": 44,
+  "ShashChess42.3": 38,
+  "Stockfish19": 39.0
+ }
+}
