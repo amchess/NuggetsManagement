@@ -1,0 +1,181 @@
+{
+ "coppie": [
+  {
+   "coppia": "ShashChess42.3 - Stockfish19",
+   "partite": 1040,
+   "decisive": 486,
+   "quota": 0.4673076923076923,
+   "ic": [
+    0.43716013685148425,
+    0.49769587961691486
+   ],
+   "vittorie_sfavorita": 0,
+   "nelo": -16.195356253220723,
+   "nelo_ic": [
+    -37.31145576542036,
+    4.920743258978913
+   ],
+   "elo": -6.013908760189192,
+   "elo_ic": [
+    -13.86102922042367,
+    1.827080438723407
+   ]
+  }
+ ],
+ "conversione": {
+  "ShashChess42.3": {
+   "da_favorito": 520,
+   "convertite": 234,
+   "conv": [
+    0.45,
+    0.40776175459969877,
+    0.4929715968561612
+   ],
+   "perse_da_favorito": 0,
+   "da_sfavorito": 520,
+   "perse": 252,
+   "perse_q": [
+    0.4846153846153846,
+    0.44193036187637097,
+    0.5275260539562012
+   ],
+   "vinte_da_sfavorito": 0
+  },
+  "Stockfish19": {
+   "da_favorito": 520,
+   "convertite": 252,
+   "conv": [
+    0.4846153846153846,
+    0.44193036187637097,
+    0.5275260539562012
+   ],
+   "perse_da_favorito": 0,
+   "da_sfavorito": 520,
+   "perse": 234,
+   "perse_q": [
+    0.45,
+    0.40776175459969877,
+    0.4929715968561612
+   ],
+   "vinte_da_sfavorito": 0
+  }
+ },
+ "spearman": {
+  "pwin_favorita": [
+   0.3734987826569513,
+   1.2038896557650368e-05
+  ],
+  "delta_wdl": [
+   -0.04679206570536544,
+   0.59704924964229
+  ],
+  "eval_motori": [
+   0.7475189407263569,
+   1.6939849365758895e-24
+  ]
+ },
+ "per_fascia_pwin": [
+  {
+   "fascia": "0.69-0.72",
+   "posizioni": 21,
+   "partite": 168,
+   "decisive": 40,
+   "quota": 0.23809523809523808,
+   "ic": [
+    0.17999951606842027,
+    0.30790096902948383
+   ]
+  },
+  {
+   "fascia": "0.72-0.75",
+   "posizioni": 34,
+   "partite": 272,
+   "decisive": 120,
+   "quota": 0.4411764705882353,
+   "ic": [
+    0.3833937358888725,
+    0.5005976562724258
+   ]
+  },
+  {
+   "fascia": "0.75-0.78",
+   "posizioni": 39,
+   "partite": 312,
+   "decisive": 140,
+   "quota": 0.44871794871794873,
+   "ic": [
+    0.3944858224290474,
+    0.5041975682326009
+   ]
+  },
+  {
+   "fascia": "0.78-0.82",
+   "posizioni": 36,
+   "partite": 288,
+   "decisive": 186,
+   "quota": 0.6458333333333334,
+   "ic": [
+    0.5890086526195106,
+    0.698818716747982
+   ]
+  }
+ ],
+ "sempre_patte": [
+  "nugget001",
+  "nugget004",
+  "nugget005",
+  "nugget013",
+  "nugget027",
+  "nugget031",
+  "nugget035",
+  "nugget041",
+  "nugget056",
+  "nugget060",
+  "nugget067",
+  "nugget071",
+  "nugget072",
+  "nugget078",
+  "nugget086",
+  "nugget089",
+  "nugget094",
+  "nugget095",
+  "nugget102",
+  "nugget105",
+  "nugget113",
+  "nugget119",
+  "nugget125",
+  "nugget127",
+  "nugget129"
+ ],
+ "sempre_decisive": [
+  "nugget007",
+  "nugget010",
+  "nugget020",
+  "nugget026",
+  "nugget030",
+  "nugget042",
+  "nugget046",
+  "nugget047",
+  "nugget050",
+  "nugget062",
+  "nugget080",
+  "nugget091",
+  "nugget096",
+  "nugget100",
+  "nugget104",
+  "nugget115",
+  "nugget117",
+  "nugget118",
+  "nugget120"
+ ],
+ "totale": {
+  "partite": 1040,
+  "decisive": 486,
+  "quota": [
+   0.4673076923076923,
+   0.43716013685148425,
+   0.49769587961691486
+  ],
+  "vittorie_sfavorita": 0
+ }
+}

@@ -1,0 +1,219 @@
+{
+ "etichetta": "F: Pfav da 0,55 a 0,95, 25'+10\"",
+ "file": [
+  "risultati/20261122_2211_fasce_tc1500/partite.pgn"
+ ],
+ "partite": 640,
+ "motori": [
+  "ShashChess42.3",
+  "Stockfish19"
+ ],
+ "coppie": 320,
+ "partite_spaiate": 0,
+ "classifica": {
+  "ShashChess42.3": {
+   "partite": 640,
+   "V": 127,
+   "P": 385,
+   "S": 128,
+   "punti": 319.5
+  },
+  "Stockfish19": {
+   "partite": 640,
+   "V": 128,
+   "P": 385,
+   "S": 127,
+   "punti": 320.5
+  }
+ },
+ "copertura": {
+  "ShashChess42.3 - Stockfish19": {
+   "posizioni": 320,
+   "partite": 640,
+   "partite_per_posizione": {
+    "2": 320
+   }
+  }
+ },
+ "disegno_incrociato": true,
+ "posizioni": 320,
+ "accoppiamenti": {
+  "ShashChess42.3 vs Stockfish19": {
+   "trinomiale": {
+    "partite": 640,
+    "V": 127,
+    "P": 385,
+    "S": 128,
+    "punteggio": 0.49921875,
+    "es": 0.012475523827205959,
+    "z": -0.06262262096732986,
+    "p": 0.9500670158413959,
+    "elo": -0.5428685441669124,
+    "elo_inf": -17.548784838114862,
+    "elo_sup": 16.46044485826573
+   },
+   "pentanomiale": {
+    "coppie": 320,
+    "conteggi": [
+     0,
+     13,
+     295,
+     12,
+     0
+    ],
+    "punteggio": 0.49921875,
+    "var_coppia": 0.0048822021484375,
+    "es": 0.0039060058517451286,
+    "z": -0.20001250117199992,
+    "p": 0.8414708041500631,
+    "elo": -0.5428685441669124,
+    "elo_es": 2.7141774867214323,
+    "elo_inf": -5.863199513613525,
+    "elo_sup": 4.777207820716093,
+    "t1": -0.007906188302632714
+   },
+   "cluster": {
+    "posizioni": 320,
+    "punteggio": 0.49921875,
+    "es": 0.0039121233274618476,
+    "t": -0.19969973710079317,
+    "gl": 319,
+    "p": 0.8418426567011308,
+    "elo": -0.5428685441669124,
+    "elo_inf": -5.891732846611793,
+    "elo_sup": 4.80573841531433,
+    "migliore_A": 12,
+    "migliore_B": 13,
+    "pari": 295,
+    "p_segno": 1.0,
+    "boot_inf": -5.972137249169184,
+    "boot_sup": 4.886135022494004
+   },
+   "mcnemar": {
+    "entrambi": 115,
+    "nessuno": 165,
+    "solo_A": 12,
+    "solo_B": 13,
+    "p": 1.0
+   },
+   "posizioni": 320,
+   "partite_per_posizione": {
+    "2": 320
+   }
+  }
+ },
+ "bt": {
+  "ShashChess42.3": -0.5428685441669119,
+  "Stockfish19": 0.0
+ },
+ "bt_ic": {
+  "ShashChess42.3": [
+   -5.972137249169209,
+   4.88613502249398
+  ],
+  "Stockfish19": [
+   0.0,
+   0.0
+  ]
+ },
+ "bt_ancora": [
+  "Stockfish19",
+  0.0
+ ],
+ "parte_favorita": {
+  "vittorie_favorita": 255,
+  "vittorie_sfavorita": 0,
+  "patte": 385,
+  "posizioni_favorito_bianco": 214,
+  "posizioni_favorito_nero": 91
+ },
+ "decisive": {
+  "totale": 255,
+  "quota": 0.3984375,
+  "posizioni_tutte_patte": 180,
+  "posizioni_tutte_decisive": 115
+ },
+ "decisive_per_fascia_eval": [
+  {
+   "fascia": "0-0.8",
+   "posizioni": 109,
+   "partite": 218,
+   "quota": 0.009174311926605505
+  },
+  {
+   "fascia": "0.8-0.9",
+   "posizioni": 42,
+   "partite": 84,
+   "quota": 0.09523809523809523
+  },
+  {
+   "fascia": "0.9-1.0",
+   "posizioni": 29,
+   "partite": 58,
+   "quota": 0.3103448275862069
+  },
+  {
+   "fascia": "1.0-1.1",
+   "posizioni": 29,
+   "partite": 58,
+   "quota": 0.43103448275862066
+  },
+  {
+   "fascia": "1.1-1.2",
+   "posizioni": 32,
+   "partite": 64,
+   "quota": 0.8125
+  },
+  {
+   "fascia": "1.2-99",
+   "posizioni": 79,
+   "partite": 158,
+   "quota": 0.9493670886075949
+  }
+ ],
+ "esecuzione": {
+  "inizio": "2026-11-22 22:11:21.999000",
+  "fine": "2026-11-23 13:38:04.038000",
+  "ore": 15.445010833333333,
+  "max_partite_simultanee": 47,
+  "durata_media_min": 64.26901643229166
+ },
+ "terminazioni": {
+  "Draw by adjudication: SyzygyTB": 145,
+  "Draw by adjudication": 215,
+  "Black wins by adjudication": 70,
+  "White wins by adjudication": 183,
+  "Draw by 3-fold repetition": 25,
+  "Black wins by adjudication: SyzygyTB": 1,
+  "White wins by adjudication: SyzygyTB": 1
+ },
+ "profondita_mediana": {
+  "Stockfish19": 41,
+  "ShashChess42.3": 40
+ },
+ "potenza": {
+  "5": 741,
+  "10": 186,
+  "15": 83,
+  "20": 47,
+  "30": 21
+ },
+ "regressione_delta": {
+  "costante": {
+   "coeff": 0.5029748255788034,
+   "es": 0.012852967431079165,
+   "p": 0.0
+  },
+  "DeltaWDL": {
+   "coeff": -0.00195881606235459,
+   "es": 0.02006014028058508,
+   "p": 0.9222124618988871
+  },
+  "distanza_Pwin": {
+   "coeff": -0.03525085199777968,
+   "es": 0.07722993389571609,
+   "p": 0.6480734121712777
+  },
+  "posizioni": 320
+ }
+}
