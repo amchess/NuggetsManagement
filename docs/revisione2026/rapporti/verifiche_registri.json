@@ -1,0 +1,63 @@
+{
+ "prima_analisi": {
+  "righe": 85491,
+  "stati": {
+   "Non nugget": 84813,
+   "Scartata": 391,
+   "Nugget": 287
+  },
+  "non_pepite_senza_wdl": 888,
+  "di_cui_matto_nella_prima_linea": 888,
+  "stesse_posizioni_con_contatori_diversi": {
+   "gruppi": 1186,
+   "righe_in_piu": 1303
+  }
+ },
+ "candidati": {
+  "banda_0_10": 2321,
+  "candidati_rianalizzati": 2321,
+  "insiemi_uguali": true,
+  "pepite_prima_analisi": 287,
+  "pepite_fra_i_candidati": 287,
+  "max_distanza_pepite_da_0_75": 0.06
+ },
+ "linee_invertite": {
+  "prima": {
+   "analisi": 2321,
+   "seconda_linea_migliore": 45,
+   "di_cui_profondita_diverse": 45
+  },
+  "rianalisi01": {
+   "analisi": 2321,
+   "seconda_linea_migliore": 48,
+   "di_cui_profondita_diverse": 48
+  },
+  "rianalisi02": {
+   "analisi": 2321,
+   "seconda_linea_migliore": 49,
+   "di_cui_profondita_diverse": 49
+  },
+  "totale": {
+   "analisi": 6963,
+   "seconda_linea_migliore": 142,
+   "quota": 0.0204
+  }
+ },
+ "media_dei_delta": {
+  "posizioni_con_media_dei_delta_diversa": 125,
+  "pepite_robuste_media_dei_delta": 233,
+  "pepite_robuste_delta_delle_medie": 241,
+  "mossa_migliore_stabile_candidati": 1981
+ },
+ "deduplicazione": {
+  "pepite_robuste": 233,
+  "scelte": 130,
+  "uguale_al_pool": true,
+  "scartate": 103,
+  "tenuta_dopo_la_scartata": 51,
+  "tenuta_prima_della_scartata": 52,
+  "top100_primi_100": true,
+  "mossa_migliore_stabile_pool": 56,
+  "stesse_posizioni_nel_pool": 0
+ }
+}

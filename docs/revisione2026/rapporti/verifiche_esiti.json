@@ -1,0 +1,136 @@
+{
+ "fasi": {
+  "C": {
+   "partite": 1040,
+   "decisive": 486,
+   "vittorie_favorita": 486,
+   "posizioni": 130,
+   "partite_per_posizione": {
+    "8": 130
+   },
+   "fine": {
+    "regola dei 10 pedoni": 484,
+    "patta per punteggio": 343,
+    "tablebase, patta": 186,
+    "ripetizione": 23,
+    "tablebase, vittoria": 2,
+    "stallo": 1,
+    "limite di 200 mosse": 1
+   },
+   "aggiudicate": 1016
+  },
+  "D": {
+   "partite": 1200,
+   "decisive": 522,
+   "vittorie_favorita": 522,
+   "posizioni": 100,
+   "partite_per_posizione": {
+    "12": 100
+   },
+   "fine": {
+    "regola dei 10 pedoni": 515,
+    "patta per punteggio": 390,
+    "tablebase, patta": 212,
+    "ripetizione": 75,
+    "tablebase, vittoria": 7,
+    "50 mosse": 1
+   },
+   "aggiudicate": 1124
+  },
+  "E4": {
+   "partite": 1040,
+   "decisive": 509,
+   "vittorie_favorita": 509,
+   "posizioni": 130,
+   "partite_per_posizione": {
+    "8": 130
+   },
+   "fine": {
+    "regola dei 10 pedoni": 456,
+    "patta per punteggio": 284,
+    "tablebase, patta": 202,
+    "tablebase, vittoria": 53,
+    "ripetizione": 42,
+    "stallo": 2,
+    "50 mosse": 1
+   },
+   "aggiudicate": 995
+  },
+  "E5": {
+   "partite": 260,
+   "decisive": 121,
+   "vittorie_favorita": 121,
+   "posizioni": 130,
+   "partite_per_posizione": {
+    "2": 130
+   },
+   "fine": {
+    "regola dei 10 pedoni": 120,
+    "patta per punteggio": 84,
+    "tablebase, patta": 52,
+    "ripetizione": 3,
+    "tablebase, vittoria": 1
+   },
+   "aggiudicate": 257
+  },
+  "E1": {
+   "partite": 500,
+   "decisive": 278,
+   "vittorie_favorita": 278,
+   "posizioni": 250,
+   "partite_per_posizione": {
+    "2": 250
+   },
+   "fine": {
+    "regola dei 10 pedoni": 275,
+    "patta per punteggio": 135,
+    "tablebase, patta": 68,
+    "ripetizione": 19,
+    "tablebase, vittoria": 3
+   },
+   "aggiudicate": 481
+  },
+  "F": {
+   "partite": 640,
+   "decisive": 255,
+   "vittorie_favorita": 255,
+   "posizioni": 320,
+   "partite_per_posizione": {
+    "2": 320
+   },
+   "fine": {
+    "regola dei 10 pedoni": 253,
+    "patta per punteggio": 215,
+    "tablebase, patta": 145,
+    "ripetizione": 25,
+    "tablebase, vittoria": 2
+   },
+   "aggiudicate": 615
+  }
+ },
+ "totale": {
+  "partite": 4680,
+  "decisive": 2171,
+  "vittorie_favorita": 2171,
+  "vittorie_sfavorita": 0,
+  "aggiudicate": 4488,
+  "posizioni_distinte": 700,
+  "partite_per_posizione": {
+   "30": 100,
+   "18": 30,
+   "2": 570
+  }
+ },
+ "limite_superiore_95_vittoria_sfavorita": {
+  "partite_indipendenti": 0.0006399089045763251,
+  "posizioni_come_unita": 0.004270473020189125,
+  "icc_0.2": {
+   "n_effettivo": 1514,
+   "limite": 0.0019768563516775473
+  },
+  "icc_0.44": {
+   "n_effettivo": 1073,
+   "limite": 0.0027870706210032514
+  }
+ }
+}
