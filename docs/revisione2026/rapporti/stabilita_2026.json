@@ -1,0 +1,46 @@
+{
+  "registri": [
+    "data/outputWch2026_SF19/tutte_le_posizioni.csv",
+    "data/rumore/run01/tutte_le_posizioni.csv",
+    "data/rumore/run02/tutte_le_posizioni.csv"
+  ],
+  "ripetizioni": 3,
+  "posizioni_comuni": 2321,
+  "ds_entro_posizione": {
+    "Pwin_media": 0.03978137941800294,
+    "Pwin_p95": 0.09579448487952388,
+    "Delta_media": 0.040472646508998775,
+    "Delta_mediana": 0.033723137457834514,
+    "Delta_p95": 0.09574314596878467
+  },
+  "quota_cambio_mossa_migliore": 0.14648858250753985,
+  "livelli": {
+    "pool": {
+      "tolleranza_Pwin": 0.06,
+      "delta_max": 0.06,
+      "pepite_per_ripetizione": [
+        287,
+        246,
+        252
+      ],
+      "pepita_in_tutte": 85,
+      "pepita_in_almeno_una": 474,
+      "classificazione_stabile": 0.8323998276604911,
+      "conferma_fra_le_pepite": 0.17932489451476794
+    },
+    "top": {
+      "tolleranza_Pwin": 0.03,
+      "delta_max": 0.03,
+      "pepite_per_ripetizione": [
+        74,
+        62,
+        67
+      ],
+      "pepita_in_tutte": 2,
+      "pepita_in_almeno_una": 160,
+      "classificazione_stabile": 0.9319258940112021,
+      "conferma_fra_le_pepite": 0.0125
+    }
+  },
+  "delta_minimo_consigliato": 0.19148629193756933
+}

@@ -1,0 +1,126 @@
+{
+ "posizioni": 2321,
+ "nodi_mediani": 10014.0,
+ "pwin": {
+  "spearman": [
+   0.7502222968341246,
+   0.0
+  ],
+  "pearson": [
+   0.9543446267022566,
+   0.0
+  ],
+  "bland_altman": {
+   "media": -0.02262093925032314,
+   "ds": 0.07617595925392315,
+   "lim": [
+    -0.1719258193880125,
+    0.12668394088736623
+   ]
+  }
+ },
+ "delta": {
+  "spearman": [
+   0.6930340181916164,
+   0.0
+  ],
+  "bland_altman": {
+   "media": -0.06911120206807411,
+   "ds": 0.08304803135770658,
+   "lim": [
+    -0.231885343529179,
+    0.09366293939303078
+   ]
+  },
+  "mediana_sf": 0.1418,
+  "mediana_lc0": 0.045
+ },
+ "mossa": {
+  "accordo": 0.8548039638087032,
+  "accordo_mossa_stabile": 0.8591620393740536,
+  "n_stabile": 1981
+ },
+ "nugget_preregistrato": {
+  "kappa": 0.14114893224482297,
+  "accordo": 0.6958207669108143,
+  "tabella": {
+   "entrambi": 132,
+   "solo_sf": 101,
+   "solo_lc0": 605,
+   "nessuno": 1483
+  },
+  "kappa_ic": [
+   0.10576970015341057,
+   0.17570074493319046
+  ],
+  "nugget_sf": 233,
+  "nugget_lc0": 737,
+  "confermati": 0.5665236051502146
+ },
+ "nugget_senza_L": {
+  "kappa": 0.13569422368068745,
+  "accordo": 0.6902197328737613,
+  "tabella": {
+   "entrambi": 139,
+   "solo_sf": 121,
+   "solo_lc0": 598,
+   "nessuno": 1463
+  },
+  "kappa_ic": [
+   0.09896820280336249,
+   0.17110715138740631
+  ],
+  "nugget_sf": 260
+ },
+ "fascia_pwin": {
+  "kappa": 0.05029962695303587,
+  "accordo": 0.5286514433433864,
+  "tabella": {
+   "entrambi": 714,
+   "solo_sf": 560,
+   "solo_lc0": 534,
+   "nessuno": 513
+  },
+  "in_fascia_sf": 1274,
+  "in_fascia_lc0": 1248
+ },
+ "sfavorita_lc0": {
+  "nugget_sf": {
+   "n": 233,
+   "mediana": 0.07,
+   "q1": 0.049,
+   "q3": 0.092,
+   "zero": 0
+  },
+  "tutte": {
+   "mediana": 0.068,
+   "q1": 0.047,
+   "q3": 0.094
+  }
+ },
+ "s4_match_c": {
+  "consenso": {
+   "posizioni": 69,
+   "partite": 552,
+   "decisive": 285,
+   "quota": 0.5163043478260869,
+   "elo_sc_sf": -4.406122243912286,
+   "elo_ic": [
+    -15.086414071830529,
+    6.265846600858412
+   ]
+  },
+  "solo_stockfish": {
+   "posizioni": 61,
+   "partite": 488,
+   "decisive": 201,
+   "quota": 0.41188524590163933,
+   "elo_sc_sf": -7.83286663331042,
+   "elo_ic": [
+    -19.401330982009185,
+    3.718252145514405
+   ]
+  },
+  "mappate": 130
+ }
+}

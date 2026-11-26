@@ -1,6 +1,6 @@
 {
     "engine_path": "/home/sdp/Stockfish/src/Stockfish19-universal",
-    "pgn_path": "data/outputWch2026_SF19/nuggets_pool.csv",
+    "pgn_path": "data/outputWch2026_SF19/candidati.csv",
     "output_dir": "data/rumore/run01",
     "concurrency": 47,
     "analysis_time": 60.0,

@@ -1,0 +1,18 @@
+== /home/sdp/Stockfish/src/Stockfish19-universal
+a9b9f7aaf817957331f672e902ea65a565b3e64f768c4617d8c194be18d1b1a0  /home/sdp/Stockfish/src/Stockfish19-universal
+id name Stockfish 19
+id author the Stockfish developers (see AUTHORS file)
+-- bench
+info depth 13 seldepth 15 multipv 1 score cp 11 nodes 38112 nps 1314206 hashfull 18 tbhits 0 time 29 pv f1g1 f8g8 g2g3 b7b5 c2c3 g7g6 d2d4 d7d6 c1h6 h8g7 h6g7 g8g7 b2b4
+Nodes searched  : 2497913
+Nodes/second    : 1497549
+
+== /home/sdp/git/ShashChess/src/ShashChess42.3-universal
+4bdf0907a31396218b9f63ad55e66e08f6c250ac89e53ef9d7b4d68ef9805c87  /home/sdp/git/ShashChess/src/ShashChess42.3-universal
+id name ShashChess 42.3
+id author the ShashChess developers (see AUTHORS file)
+-- bench
+info depth 13 seldepth 19 multipv 1 score cp 37 wdl 75 921 4 nodes 18226 nps 1215066 hashfull 24 tbhits 0 time 15 pv d2d4 g7g6 c2c3 f8g8 f1g1 e7e5 d4d5
+Nodes searched  : 2443546
+Nodes/second    : 1437380
+

@@ -1,0 +1,23 @@
+{
+  "avvio": "2026-11-17T10:03:11",
+  "config": {
+    "engine_path": "/home/sdp/Stockfish/src/Stockfish19-universal",
+    "pgn_path": "data/wch.pgn",
+    "output_dir": "data/outputWch2026_SF19",
+    "concurrency": 47,
+    "analysis_time": 60.0,
+    "wdl_tolerance": 0.06,
+    "delta_max": 0.06,
+    "opposite_max": 0.0,
+    "threads": 4,
+    "hash": 2048,
+    "syzygy_path": "/home/sdp/syzygy",
+    "nuova_partita_per_posizione": true,
+    "registro": true,
+    "registro_csv": "tutte_le_posizioni.csv"
+  },
+  "host": "igk-smg-svr011",
+  "fine": "2026-11-18T16:22:43",
+  "durata_secondi": 109171.7,
+  "pepite": 287
+}

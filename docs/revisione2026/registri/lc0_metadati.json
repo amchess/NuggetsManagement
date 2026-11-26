@@ -1,0 +1,26 @@
+{
+  "avvio": "2026-11-22T01:37:13",
+  "config": {
+    "engine_path": "/home/sdp/lc0/build/release/lc0",
+    "pgn_path": "data/outputWch2026_SF19/candidati.csv",
+    "output_dir": "data/outputWch2026_Lc0",
+    "concurrency": 47,
+    "analysis_nodes": 10000,
+    "wdl_tolerance": 0.06,
+    "delta_max": 0.06,
+    "opposite_max": 0.0,
+    "threads": 4,
+    "syzygy_path": "/home/sdp/syzygy",
+    "engine_options": {
+      "WeightsFile": "/home/sdp/lc0/reti/t3-512x15x16h-distill2-swa-03477500.pb.gz",
+      "Backend": "blas",
+      "MinibatchSize": 32,
+      "SmartPruningFactor": 0
+    },
+    "nuova_partita_per_posizione": true
+  },
+  "host": "igk-smg-svr011",
+  "fine": "2026-11-22T03:24:00",
+  "durata_secondi": 6407.3,
+  "pepite": 0
+}

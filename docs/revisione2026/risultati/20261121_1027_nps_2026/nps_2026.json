@@ -1,0 +1,78 @@
+{
+  "condizioni": {
+    "posizioni": "/home/sdp/NuggetsManagement/docs/revisione2026/posizioni/nuggets_top100_robusto.epd",
+    "n_posizioni": 10,
+    "movetime_ms": 5000,
+    "paralleli": 47,
+    "threads": 4,
+    "hash": 2048,
+    "ripetizioni": 5,
+    "durata_s": 1055
+  },
+  "sintesi": {
+    "Stockfish19": {
+      "nps_medio_istanza": 3505284.005106383,
+      "ds_fra_ripetizioni": 58756.13075789834,
+      "ic95": [
+        3433563.818140499,
+        3577004.192072267
+      ],
+      "cv_percento": 1.6762159834211532,
+      "profondita_mediana": 26.0
+    },
+    "ShashChess42.3": {
+      "nps_medio_istanza": 3378914.161276596,
+      "ds_fra_ripetizioni": 32256.336720999596,
+      "ic95": [
+        3339540.7295917054,
+        3418287.592961487
+      ],
+      "cv_percento": 0.954636169532426,
+      "profondita_mediana": 26.0,
+      "rapporto_su_Stockfish19": {
+        "media": 0.9641013903971029,
+        "ds": 0.013821466424796864,
+        "ic95": [
+          0.9472303312694412,
+          0.9809724495247645
+        ]
+      }
+    },
+    "Reckless0.9.0": {
+      "nps_medio_istanza": 4071693.307659575,
+      "ds_fra_ripetizioni": 7414.17991949102,
+      "ic95": [
+        4062643.2500202176,
+        4080743.365298932
+      ],
+      "cv_percento": 0.18209082460959516,
+      "profondita_mediana": 24.0,
+      "rapporto_su_Stockfish19": {
+        "media": 1.1618318410668818,
+        "ds": 0.018308006325198724,
+        "ic95": [
+          1.1394843239707304,
+          1.184179358163033
+        ]
+      }
+    },
+    "Triumviratus8.1": {
+      "nps_medio_istanza": 3211439.795744681,
+      "ds_fra_ripetizioni": 32221.479740267187,
+      "ic95": [
+        3172108.911946163,
+        3250770.6795431986
+      ],
+      "cv_percento": 1.0033343854978152,
+      "profondita_mediana": 28.0,
+      "rapporto_su_Stockfish19": {
+        "media": 0.9163547286065251,
+        "ds": 0.016412445201708113,
+        "ic95": [
+          0.8963210125797835,
+          0.9363884446332668
+        ]
+      }
+    }
+  }
+}

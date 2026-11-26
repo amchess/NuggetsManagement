@@ -1,0 +1,432 @@
+{
+ "etichetta": "E1: controllo UHO",
+ "file": [
+  "dati/20261121_1156_controllo_uho/partite.pgn"
+ ],
+ "partite": 500,
+ "motori": [
+  "ShashChess42.3",
+  "Stockfish19"
+ ],
+ "coppie": 250,
+ "partite_spaiate": 0,
+ "classifica": {
+  "ShashChess42.3": {
+   "partite": 500,
+   "V": 142,
+   "P": 222,
+   "S": 136,
+   "punti": 253.0
+  },
+  "Stockfish19": {
+   "partite": 500,
+   "V": 136,
+   "P": 222,
+   "S": 142,
+   "punti": 247.0
+  }
+ },
+ "copertura": {
+  "ShashChess42.3 - Stockfish19": {
+   "posizioni": 250,
+   "partite": 500,
+   "partite_per_posizione": {
+    "2": 250
+   }
+  }
+ },
+ "disegno_incrociato": true,
+ "posizioni": 250,
+ "accoppiamenti": {
+  "ShashChess42.3 vs Stockfish19": {
+   "trinomiale": {
+    "partite": 500,
+    "V": 142,
+    "P": 222,
+    "S": 136,
+    "punteggio": 0.506,
+    "es": 0.0166711727241967,
+    "z": 0.3599026954649416,
+    "p": 0.718919901233626,
+    "elo": 4.169427166460891,
+    "elo_inf": -18.553651554318147,
+    "elo_sup": 26.92828047226794
+   },
+   "pentanomiale": {
+    "coppie": 250,
+    "conteggi": [
+     0,
+     26,
+     192,
+     32,
+     0
+    ],
+    "punteggio": 0.506,
+    "var_coppia": 0.014464000000000001,
+    "es": 0.007606313167363017,
+    "z": 0.7888184285843842,
+    "p": 0.43021813696417255,
+    "elo": 4.169427166460891,
+    "elo_es": 5.286168946270348,
+    "elo_inf": -6.190827260392356,
+    "elo_sup": 14.537103536193156,
+    "t1": 0.03527703256438493
+   },
+   "cluster": {
+    "posizioni": 250,
+    "punteggio": 0.506,
+    "es": 0.007621571584237375,
+    "t": 0.7872392109271743,
+    "gl": 249,
+    "p": 0.43189052581366844,
+    "elo": 4.169427166460891,
+    "elo_inf": -6.262138671515581,
+    "elo_sup": 14.608517539934212,
+    "migliore_A": 32,
+    "migliore_B": 26,
+    "pari": 192,
+    "p_segno": 0.5118423084381691,
+    "boot_inf": -6.254516085516096,
+    "boot_sup": 14.600883953984505
+   },
+   "mcnemar": {
+    "entrambi": 110,
+    "nessuno": 82,
+    "solo_A": 32,
+    "solo_B": 26,
+    "p": 0.5118423084381691
+   },
+   "posizioni": 250,
+   "partite_per_posizione": {
+    "2": 250
+   }
+  }
+ },
+ "bt": {
+  "ShashChess42.3": 4.169427166460877,
+  "Stockfish19": 0.0
+ },
+ "bt_ic": {
+  "ShashChess42.3": [
+   -6.254516085516111,
+   14.600883953984495
+  ],
+  "Stockfish19": [
+   0.0,
+   0.0
+  ]
+ },
+ "bt_ancora": [
+  "Stockfish19",
+  0.0
+ ],
+ "parte_favorita": {
+  "vittorie_favorita": 278,
+  "vittorie_sfavorita": 0,
+  "patte": 222,
+  "posizioni_favorito_bianco": 250,
+  "posizioni_favorito_nero": 0
+ },
+ "decisive": {
+  "totale": 278,
+  "quota": 0.556,
+  "posizioni_tutte_patte": 82,
+  "posizioni_tutte_decisive": 110
+ },
+ "decisive_per_fascia_eval": [
+  {
+   "fascia": "0-0.8",
+   "posizioni": 2,
+   "partite": 4,
+   "quota": 0.0
+  },
+  {
+   "fascia": "0.8-0.9",
+   "posizioni": 17,
+   "partite": 34,
+   "quota": 0.14705882352941177
+  },
+  {
+   "fascia": "0.9-1.0",
+   "posizioni": 63,
+   "partite": 126,
+   "quota": 0.30158730158730157
+  },
+  {
+   "fascia": "1.0-1.1",
+   "posizioni": 85,
+   "partite": 170,
+   "quota": 0.5764705882352941
+  },
+  {
+   "fascia": "1.1-1.2",
+   "posizioni": 66,
+   "partite": 132,
+   "quota": 0.803030303030303
+  },
+  {
+   "fascia": "1.2-99",
+   "posizioni": 17,
+   "partite": 34,
+   "quota": 0.9117647058823529
+  }
+ ],
+ "esecuzione": {
+  "inizio": "2026-11-21 11:56:46.057000",
+  "fine": "2026-11-22 01:24:31.226000",
+  "ore": 13.462546944444444,
+  "max_partite_simultanee": 47,
+  "durata_media_min": 72.99545173333334
+ },
+ "terminazioni": {
+  "Draw by adjudication": 135,
+  "White wins by adjudication": 275,
+  "Draw by adjudication: SyzygyTB": 68,
+  "White wins by adjudication: SyzygyTB": 3,
+  "Draw by 3-fold repetition": 19
+ },
+ "profondita_mediana": {
+  "Stockfish19": 37,
+  "ShashChess42.3": 37.0
+ },
+ "potenza": {
+  "5": 2193,
+  "10": 549,
+  "15": 244,
+  "20": 138,
+  "30": 62
+ },
+ "regressione_delta": {
+  "costante": {
+   "coeff": 0.5026410166415861,
+   "es": 0.016245108556009677,
+   "p": 3.3504409401329404e-210
+  },
+  "DeltaWDL": {
+   "coeff": 0.027462133431861456,
+   "es": 0.04106027810659803,
+   "p": 0.5036072271024952
+  },
+  "distanza_Pwin": {
+   "coeff": -0.01301944165692662,
+   "es": 0.39542869333055825,
+   "p": 0.9737344934274961
+  },
+  "posizioni": 250
+ },
+ "confronto": {
+  "risultati": {
+   "etichetta": "confronto",
+   "file": [
+    "risultati/20261118_2057_pool_robusto/partite.pgn"
+   ],
+   "partite": 1040,
+   "motori": [
+    "ShashChess42.3",
+    "Stockfish19"
+   ],
+   "coppie": 520,
+   "partite_spaiate": 0,
+   "classifica": {
+    "ShashChess42.3": {
+     "partite": 1040,
+     "V": 234,
+     "P": 554,
+     "S": 252,
+     "punti": 511.0
+    },
+    "Stockfish19": {
+     "partite": 1040,
+     "V": 252,
+     "P": 554,
+     "S": 234,
+     "punti": 529.0
+    }
+   },
+   "copertura": {
+    "ShashChess42.3 - Stockfish19": {
+     "posizioni": 130,
+     "partite": 1040,
+     "partite_per_posizione": {
+      "8": 130
+     }
+    }
+   },
+   "disegno_incrociato": true,
+   "posizioni": 130,
+   "accoppiamenti": {
+    "ShashChess42.3 vs Stockfish19": {
+     "trinomiale": {
+      "partite": 1040,
+      "V": 234,
+      "P": 554,
+      "S": 252,
+      "punteggio": 0.4913461538461538,
+      "es": 0.010595356113722863,
+      "z": -0.8167584044332323,
+      "p": 0.4140665073177686,
+      "elo": -6.013908760189192,
+      "elo_inf": -20.467270198323945,
+      "elo_sup": 8.418657748807066
+     },
+     "pentanomiale": {
+      "coppie": 520,
+      "conteggi": [
+       0,
+       81,
+       376,
+       63,
+       0
+      ],
+      "punteggio": 0.4913461538461538,
+      "var_coppia": 0.01723280325443787,
+      "es": 0.0057567357294333365,
+      "z": -1.5032557616984823,
+      "p": 0.1327731031461575,
+      "elo": -6.013908760189192,
+      "elo_es": 4.001388338446581,
+      "elo_inf": -13.86102922042367,
+      "elo_sup": 1.827080438723407,
+      "t1": -0.04661398235549242
+     },
+     "cluster": {
+      "posizioni": 130,
+      "punteggio": 0.4913461538461538,
+      "es": 0.005861662650870758,
+      "t": -1.4763466731680026,
+      "gl": 129,
+      "p": 0.1422877787788617,
+      "elo": -6.013908760189192,
+      "elo_inf": -14.079739538557156,
+      "elo_sup": 2.045444299127306,
+      "migliore_A": 30,
+      "migliore_B": 39,
+      "pari": 61,
+      "p_segno": 0.3355576182340152,
+      "boot_inf": -14.038687793271787,
+      "boot_sup": 2.0044583093326755
+     },
+     "mcnemar": {
+      "entrambi": 171,
+      "nessuno": 205,
+      "solo_A": 63,
+      "solo_B": 81,
+      "p": 0.15633984208003965
+     },
+     "posizioni": 130,
+     "partite_per_posizione": {
+      "8": 130
+     }
+    }
+   },
+   "bt": {
+    "ShashChess42.3": -6.013908760189208,
+    "Stockfish19": 0.0
+   },
+   "bt_ic": {
+    "ShashChess42.3": [
+     -13.704082290931218,
+     2.0044583093327
+    ],
+    "Stockfish19": [
+     0.0,
+     0.0
+    ]
+   },
+   "bt_ancora": [
+    "Stockfish19",
+    0.0
+   ],
+   "parte_favorita": {
+    "vittorie_favorita": 486,
+    "vittorie_sfavorita": 0,
+    "patte": 554,
+    "posizioni_favorito_bianco": 98,
+    "posizioni_favorito_nero": 32
+   },
+   "decisive": {
+    "totale": 486,
+    "quota": 0.4673076923076923,
+    "posizioni_tutte_patte": 25,
+    "posizioni_tutte_decisive": 19
+   },
+   "decisive_per_fascia_eval": [
+    {
+     "fascia": "0-0.8",
+     "posizioni": 5,
+     "partite": 40,
+     "quota": 0.075
+    },
+    {
+     "fascia": "0.8-0.9",
+     "posizioni": 13,
+     "partite": 104,
+     "quota": 0.09615384615384616
+    },
+    {
+     "fascia": "0.9-1.0",
+     "posizioni": 38,
+     "partite": 304,
+     "quota": 0.2730263157894737
+    },
+    {
+     "fascia": "1.0-1.1",
+     "posizioni": 38,
+     "partite": 304,
+     "quota": 0.5131578947368421
+    },
+    {
+     "fascia": "1.1-1.2",
+     "posizioni": 29,
+     "partite": 232,
+     "quota": 0.7801724137931034
+    },
+    {
+     "fascia": "1.2-99",
+     "posizioni": 7,
+     "partite": 56,
+     "quota": 0.9464285714285714
+    }
+   ],
+   "esecuzione": {
+    "inizio": "2026-11-18 20:58:01.512000",
+    "fine": "2026-11-19 23:27:55.351000",
+    "ore": 26.498288611111114,
+    "max_partite_simultanee": 47,
+    "durata_media_min": 69.75954634615384
+   },
+   "terminazioni": {
+    "Draw by adjudication": 343,
+    "White wins by adjudication": 363,
+    "Draw by adjudication: SyzygyTB": 186,
+    "Draw by stalemate": 1,
+    "Black wins by adjudication": 121,
+    "Draw by 3-fold repetition": 23,
+    "White wins by adjudication: SyzygyTB": 2,
+    "Draw by adjudication: maximal game length": 1
+   },
+   "profondita_mediana": {
+    "Stockfish19": 39.0,
+    "ShashChess42.3": 38
+   },
+   "potenza": {
+    "5": 2613,
+    "10": 654,
+    "15": 291,
+    "20": 164,
+    "30": 73
+   }
+  },
+  "interazione": {
+   "coppia": "ShashChess42.3 - Stockfish19",
+   "etichetta_1": "E1: controllo UHO",
+   "etichetta_2": "confronto",
+   "elo_1": 4.169427166460891,
+   "elo_2": -6.013908760189192,
+   "differenza": 10.183335926650084,
+   "es": 6.629833388824282,
+   "z": 1.535986702745176,
+   "p": 0.12454164165451753
+  }
+ }
+}
